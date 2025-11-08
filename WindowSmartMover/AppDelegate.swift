@@ -1,0 +1,351 @@
+import Cocoa
+import Carbon
+import SwiftUI
+
+// グローバル変数としてAppDelegateの参照を保持
+private var globalAppDelegate: AppDelegate?
+
+// Cイベントハンドラー
+private func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?, userData: UnsafeMutableRawPointer?) -> OSStatus {
+    var hotKeyID = EventHotKeyID()
+    let status = GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+    
+    guard status == noErr else {
+        return status
+    }
+    
+    guard let appDelegate = globalAppDelegate else {
+        return OSStatus(eventNotHandledErr)
+    }
+    
+    print("🔥 ホットキーが押されました: ID = \(hotKeyID.id)")
+    
+    DispatchQueue.main.async {
+        switch hotKeyID.id {
+        case 1: // 右矢印（次の画面）
+            appDelegate.moveWindowToNextScreen()
+        case 2: // 左矢印（前の画面）
+            appDelegate.moveWindowToPrevScreen()
+        default:
+            break
+        }
+    }
+    
+    return noErr
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var statusItem: NSStatusItem?
+    var hotKeyRef: EventHotKeyRef?
+    var hotKeyRef2: EventHotKeyRef?
+    var eventHandler: EventHandlerRef?
+    var settingsWindow: NSWindow?
+    var aboutWindow: NSWindow?
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // グローバル参照を設定
+        globalAppDelegate = self
+        
+        // システムバーにアイコンを追加
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        
+        if let button = statusItem?.button {
+            button.image = NSImage(systemSymbolName: "rectangle.2.swap", accessibilityDescription: "Window Mover")
+            button.image?.isTemplate = true
+        }
+        
+        // メニューを設定
+        setupMenu()
+        
+        // グローバルホットキーを登録
+        registerHotKeys()
+        
+        // アクセシビリティ権限をチェック
+        checkAccessibilityPermissions()
+        
+        debugPrint("アプリが起動しました")
+        debugPrint("接続されている画面数: \(NSScreen.screens.count)")
+    }
+    
+    func setupMenu() {
+        let menu = NSMenu()
+        
+        let modifierString = HotKeySettings.shared.getModifierString()
+        menu.addItem(NSMenuItem(title: "ウィンドウを次の画面へ (\(modifierString)→)", action: #selector(moveWindowToNextScreen), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "ウィンドウを前の画面へ (\(modifierString)←)", action: #selector(moveWindowToPrevScreen), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "ショートカット設定...", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "デバッグ情報を表示", action: #selector(showDebugInfo), keyEquivalent: "d"))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "About WindowSmartMover", action: #selector(openAbout), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        
+        statusItem?.menu = menu
+    }
+    
+    @objc func openSettings() {
+        if settingsWindow == nil {
+            let settingsView = SettingsView()
+            let hostingController = NSHostingController(rootView: settingsView)
+            
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = "設定"
+            window.styleMask = [.titled, .closable]
+            window.center()
+            window.level = .floating
+            
+            settingsWindow = window
+        }
+        
+        settingsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc func openAbout() {
+        if aboutWindow == nil {
+            let aboutView = AboutView()
+            let hostingController = NSHostingController(rootView: aboutView)
+            
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = "About"
+            window.styleMask = [.titled, .closable]
+            window.center()
+            window.level = .floating
+            
+            aboutWindow = window
+        }
+        
+        aboutWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    func registerHotKeys() {
+        // 既存のホットキーを解除
+        if let hotKey = hotKeyRef {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef = nil
+        }
+        if let hotKey = hotKeyRef2 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef2 = nil
+        }
+        
+        // イベントタイプの指定
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        
+        // イベントハンドラをインストール（初回のみ）
+        if eventHandler == nil {
+            let status = InstallEventHandler(GetApplicationEventTarget(), hotKeyHandler, 1, &eventType, nil, &eventHandler)
+            
+            if status == noErr {
+                debugPrint("✅ イベントハンドラのインストール成功")
+            } else {
+                debugPrint("❌ イベントハンドラのインストール失敗: \(status)")
+            }
+        }
+        
+        // 設定から修飾キーを取得
+        let modifiers = HotKeySettings.shared.getModifiers()
+        let modifierString = HotKeySettings.shared.getModifierString()
+        
+        // Ctrl + Option + Command + 右矢印
+        var gMyHotKeyID1 = EventHotKeyID(signature: OSType(0x4D4F5652), id: 1) // 'MOVR'
+        var hotKey1: EventHotKeyRef?
+        let registerStatus1 = RegisterEventHotKey(UInt32(kVK_RightArrow), modifiers, gMyHotKeyID1, GetApplicationEventTarget(), 0, &hotKey1)
+        
+        if registerStatus1 == noErr {
+            hotKeyRef = hotKey1
+            debugPrint("✅ ホットキー1 (\(modifierString)→) の登録成功")
+        } else {
+            debugPrint("❌ ホットキー1 の登録失敗: \(registerStatus1)")
+        }
+        
+        // Ctrl + Option + Command + 左矢印
+        var gMyHotKeyID2 = EventHotKeyID(signature: OSType(0x4D4F564C), id: 2) // 'MOVL'
+        var hotKey2: EventHotKeyRef?
+        let registerStatus2 = RegisterEventHotKey(UInt32(kVK_LeftArrow), modifiers, gMyHotKeyID2, GetApplicationEventTarget(), 0, &hotKey2)
+        
+        if registerStatus2 == noErr {
+            hotKeyRef2 = hotKey2
+            debugPrint("✅ ホットキー2 (\(modifierString)←) の登録成功")
+        } else {
+            debugPrint("❌ ホットキー2 の登録失敗: \(registerStatus2)")
+        }
+    }
+    
+    @objc func moveWindowToNextScreen() {
+        debugPrint("=== 次の画面への移動を開始 ===")
+        moveWindow(direction: 1)
+    }
+    
+    @objc func moveWindowToPrevScreen() {
+        debugPrint("=== 前の画面への移動を開始 ===")
+        moveWindow(direction: -1)
+    }
+    
+    func moveWindow(direction: Int) {
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
+            debugPrint("❌ フロントアプリを取得できませんでした")
+            return
+        }
+        
+        debugPrint("フロントアプリ: \(frontmostApp.localizedName ?? "不明")")
+        
+        let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
+        let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]]
+        
+        // フロントアプリのメインウィンドウを探す
+        guard let windows = windowList,
+              let targetWindow = windows.first(where: { window in
+                  guard let ownerPID = window[kCGWindowOwnerPID as String] as? Int32,
+                        ownerPID == frontmostApp.processIdentifier,
+                        let layer = window[kCGWindowLayer as String] as? Int,
+                        layer == 0 else { return false }
+                  return true
+              }),
+              let boundsDict = targetWindow[kCGWindowBounds as String] as? [String: CGFloat]
+        else {
+            debugPrint("❌ ターゲットウィンドウが見つかりませんでした")
+            return
+        }
+        
+        let currentFrame = CGRect(
+            x: boundsDict["X"] ?? 0,
+            y: boundsDict["Y"] ?? 0,
+            width: boundsDict["Width"] ?? 0,
+            height: boundsDict["Height"] ?? 0
+        )
+        
+        debugPrint("現在のウィンドウ位置: \(currentFrame)")
+        
+        // 現在のウィンドウがある画面を特定
+        let screens = NSScreen.screens
+        guard let currentScreenIndex = screens.firstIndex(where: { screen in
+            screen.frame.intersects(currentFrame)
+        }) else {
+            debugPrint("❌ 現在の画面を特定できませんでした")
+            return
+        }
+        
+        debugPrint("現在の画面インデックス: \(currentScreenIndex)")
+        
+        // 次の画面を計算
+        let nextScreenIndex = (currentScreenIndex + direction + screens.count) % screens.count
+        let targetScreen = screens[nextScreenIndex]
+        
+        debugPrint("移動先画面インデックス: \(nextScreenIndex)")
+        debugPrint("移動先画面のフレーム: \(targetScreen.frame)")
+        
+        // ウィンドウの相対位置を維持して移動
+        let currentScreen = screens[currentScreenIndex]
+        let relativeX = currentFrame.origin.x - currentScreen.frame.origin.x
+        let relativeY = currentFrame.origin.y - currentScreen.frame.origin.y
+        
+        let newX = targetScreen.frame.origin.x + relativeX
+        let newY = targetScreen.frame.origin.y + relativeY
+        
+        debugPrint("新しい位置: x=\(newX), y=\(newY)")
+        
+        // Accessibility APIを使用してウィンドウを移動
+        let appRef = AXUIElementCreateApplication(frontmostApp.processIdentifier)
+        
+        // まずフォーカスウィンドウを試す
+        var value: CFTypeRef?
+        var result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &value)
+        
+        // フォーカスウィンドウが取得できない場合は、全ウィンドウリストから取得
+        if result != .success {
+            var windowList: CFTypeRef?
+            result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowList)
+            
+            if result == .success, let windows = windowList as? [AXUIElement], !windows.isEmpty {
+                value = windows[0]
+                result = .success
+            }
+        }
+        
+        if result == .success, let windowElement = value {
+            // 現在の位置を確認
+            var currentPos: CFTypeRef?
+            if AXUIElementCopyAttributeValue(windowElement as! AXUIElement, kAXPositionAttribute as CFString, &currentPos) == .success {
+                var point = CGPoint.zero
+                if AXValueGetValue(currentPos as! AXValue, .cgPoint, &point) {
+                    debugPrint("現在のAX位置: \(point)")
+                }
+            }
+            
+            // 新しい位置を設定
+            var position = CGPoint(x: newX, y: newY)
+            
+            if let positionValue = AXValueCreate(.cgPoint, &position) {
+                let setResult = AXUIElementSetAttributeValue(windowElement as! AXUIElement, kAXPositionAttribute as CFString, positionValue)
+                
+                if setResult == .success {
+                    debugPrint("✅ ウィンドウの移動に成功しました")
+                } else {
+                    debugPrint("❌ ウィンドウの移動に失敗: \(setResult.rawValue)")
+                }
+            }
+        }
+    }
+    
+    @objc func showDebugInfo() {
+        debugPrint("\n=== デバッグ情報 ===")
+        debugPrint("接続されている画面数: \(NSScreen.screens.count)")
+        
+        for (index, screen) in NSScreen.screens.enumerated() {
+            debugPrint("画面 \(index): \(screen.frame)")
+            let name = screen.localizedName
+            debugPrint("  名前: \(name)")
+        }
+        
+        if let frontmostApp = NSWorkspace.shared.frontmostApplication {
+            debugPrint("現在のフロントアプリ: \(frontmostApp.localizedName ?? "不明")")
+        }
+        
+        debugPrint("アクセシビリティ権限: \(AXIsProcessTrusted())")
+        debugPrint("現在のショートカット: \(HotKeySettings.shared.getModifierString())← / →")
+        debugPrint("===================\n")
+    }
+    
+    func checkAccessibilityPermissions() {
+        let trusted = AXIsProcessTrusted()
+        if !trusted {
+            debugPrint("⚠️ アクセシビリティ権限が必要です")
+            
+            let alert = NSAlert()
+            alert.messageText = "アクセシビリティ権限が必要です"
+            alert.informativeText = "このアプリはウィンドウを移動するためにアクセシビリティ権限が必要です。\n\nシステム設定 > プライバシーとセキュリティ > アクセシビリティ\nでこのアプリを許可してください。"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "システム設定を開く")
+            alert.addButton(withTitle: "あとで")
+            
+            if alert.runModal() == .alertFirstButtonReturn {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        } else {
+            debugPrint("✅ アクセシビリティ権限が付与されています")
+        }
+    }
+    
+    func debugPrint(_ message: String) {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        print("[\(timestamp)] \(message)")
+    }
+    
+    deinit {
+        // ホットキーの登録解除
+        if let hotKey = hotKeyRef {
+            UnregisterEventHotKey(hotKey)
+        }
+        if let hotKey = hotKeyRef2 {
+            UnregisterEventHotKey(hotKey)
+        }
+        if let handler = eventHandler {
+            RemoveEventHandler(handler)
+        }
+    }
+}

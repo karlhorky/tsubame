@@ -1,17 +1,12 @@
-//
-//  WindowSmartMoverApp.swift
-//  WindowSmartMover
-//
-//  Created by Masahito Zembutsu on 2025/10/18.
-//
-
 import SwiftUI
 
 @main
 struct WindowSmartMoverApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        Settings {
+            SettingsView()
         }
     }
 }
