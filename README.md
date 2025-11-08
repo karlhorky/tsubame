@@ -4,6 +4,11 @@
 
 A lightweight macOS menu bar app for effortless window management across multiple displays.
 
+
+> **⚠️ Note**: v1.1.0 is not yet notarized by Apple. macOS 15+ users may experience security blocks. 
+> A notarized version (v1.1.1) is coming soon.
+
+
 ![macOS](https://img.shields.io/badge/macOS-14.0+-blue)
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
