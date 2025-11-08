@@ -7,6 +7,8 @@ A lightweight macOS menu bar app for effortless window management across multipl
 ![macOS](https://img.shields.io/badge/macOS-14.0+-blue)
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![GitHub release](https://img.shields.io/github/v/release/zembutsu/WindowSmartMover)
+![GitHub downloads](https://img.shields.io/github/downloads/zembutsu/WindowSmartMover/total)
 
 ## Features
 

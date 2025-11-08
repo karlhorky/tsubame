@@ -2,6 +2,13 @@
 
 [English](README.md) | [日本語](README_ja.md)
 
+
+![macOS](https://img.shields.io/badge/macOS-14.0+-blue)
+![Swift](https://img.shields.io/badge/Swift-6.2-orange)
+![License](https://img.shields.io/badge/License-MIT-green)
+![GitHub release](https://img.shields.io/github/v/release/zembutsu/WindowSmartMover)
+![GitHub downloads](https://img.shields.io/github/downloads/zembutsu/WindowSmartMover/total)
+
 macOS で複数ディスプレイを利用する時に役立つ、シンプルなウィンドウ管理（ショートカット移動・位置の記憶）ツールです。
 
 ## 開発理由・背景
