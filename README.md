@@ -30,22 +30,30 @@ A lightweight macOS menu bar app for effortless window management across multipl
 - **Sleep/Wake Support**: Works seamlessly after waking from sleep
 - **Multi-Window Support**: Handles multiple windows per app individually
 
-### Coming Soon (v1.2.0 - In Development) 🚧
+### Advanced Configuration (v1.2.0+)
+- **Two-Stage Display Reconnection**: Intelligent timing for reliable window restoration
+  - Stage 1: Wait for display configuration to stabilize (0.5s default)
+  - Stage 2: Wait for macOS coordinate updates (2.5s default)
+- **Configurable Timing Settings**: Fine-tune both stages independently (0.1-10s range)
+  - Adjust for slower/faster display hardware
+  - Optimize for your specific multi-monitor setup
+  - Settings persist across app restarts
+
+### Coming Soon (v1.3.0 - In Development) 🚧
 
 ⚠️ **Note**: These features are under active development and not yet available in stable releases.
 
-- **Debug Log Viewer**: Real-time logging for troubleshooting
-  - View all system events and window operations
-  - Copy logs to clipboard for issue reporting
-  - Clear logs on demand
-  - Memory-only storage (no disk writes)
-- **Configurable Window Restore Timing**: Fine-tune display reconnection behavior
-  - Adjustable delay from 0.1 to 10.0 seconds (default: 1.5s)
-  - Helps with displays that need extra stabilization time
-  - Per-user customization in Settings dialog
-- **Enhanced Settings Dialog**: Unified configuration interface
-  - Combined hotkey and timing settings
-  - One-click reset to defaults
+- **Manual Window Snapshot & Restore**: Save and restore window layouts on demand
+  - Save current layout: Configurable hotkey (default: Ctrl+Cmd+↑)
+  - Restore saved layout: Configurable hotkey (default: Ctrl+Cmd+↓)
+  - Independent from automatic restoration
+  - Perfect fallback when automatic restoration fails
+  - Visual feedback with success/failure notifications
+  - Menu bar integration
+- **Internationalization (English UI + Japanese localization)**
+  - English as default language
+  - Japanese localization
+  - Localized debug logs for international users
 
 For detailed development progress, see [CHANGELOG.md](CHANGELOG.md).
 
@@ -116,22 +124,20 @@ This project embodies the philosophy: **understand deeply by building yourself**
 3. Choose your preferred modifier keys
 4. Restart the app
 
-### Debug Log Viewer (v1.2.0+) 🚧
-> **Note**: This feature is in development. Available in v1.2.0-beta and later.
+### Configuring Display Reconnection Timing
+1. Click the menu bar icon
+2. Select "Settings..."
+3. Adjust timing settings:
+   - **Display Change Detection Stabilization Time**: How long to wait for display configuration to settle (0.1-3.0s)
+   - **Window Restore Delay**: How long to wait for macOS to update window coordinates (0.1-10.0s)
+4. Changes take effect immediately on next display reconnection
 
+### Using Debug Logs
 1. Click the menu bar icon
 2. Select "Show Debug Log"
 3. View real-time logs of window operations
 4. Use "Copy" to save logs for issue reporting
 5. Use "Clear" to reset the log buffer
-
-### Configuring Window Restore Timing (v1.2.0+) 🚧
-> **Note**: This feature is in development. Available in v1.2.0-beta and later.
-
-1. Click the menu bar icon
-2. Select "Settings..."
-3. Adjust "Window Restore Delay" slider (0.1-10.0 seconds)
-4. Changes take effect immediately on next display reconnection
 
 ## Building from Source
 
@@ -188,14 +194,15 @@ open WindowSmartMover.xcodeproj
 - Some apps don't support programmatic window control
 
 ### Automatic restoration not working
-- **(v1.2.0+)** Check debug logs: Menu bar icon → "Show Debug Log" 🚧
+- Check debug logs: Menu bar icon → "Show Debug Log"
 - Ensure external display is properly detected
 - Try manual window movement first to verify permissions
-- Adjust window restore timing if displays need more stabilization time
+- **Adjust timing settings if needed**:
+  - Increase "Display Change Detection Stabilization Time" if your display changes rapidly during wake
+  - Increase "Window Restore Delay" if your display hardware needs more initialization time
+  - Access via Menu bar → "Settings..." → Timing section
 
-### Using Debug Logs (v1.2.0+) 🚧
-> **Note**: Debug log feature is available in v1.2.0-beta and later.
-
+### Using Debug Logs
 The debug log viewer helps diagnose issues:
 1. Reproduce the problem
 2. Open debug logs (Menu bar → "Show Debug Log")
@@ -212,15 +219,23 @@ No sensitive information is logged or transmitted.
 
 ## Roadmap
 
-### In Development (v1.2.0)
-- [x] Debug log viewer
-- [x] Configurable window restore timing
-- [ ] Internationalization (English UI + Japanese localization)
+### Completed (v1.2.0)
+- [x] Two-stage display reconnection timing
+- [x] Configurable stabilization and restore delays
+- [x] Enhanced window position detection logic
+- [x] Debug log viewer with copy functionality
 
-### Future Considerations
+### In Development (v1.3.0)
+- [ ] Manual window snapshot & restore with configurable hotkeys
+- [ ] Internationalization (English UI + Japanese localization)
+- [ ] Localized debug logs
+
+### Future Considerations (Post v1.3.0)
+- [ ] Multiple snapshot slots (save/restore multiple layouts)
+- [ ] Persistent snapshot storage
+- [ ] Snapshot management interface
 - [ ] Window size restoration (currently position only)
 - [ ] Support for more than 2 displays
-- [ ] Preferences for snapshot interval
 - [ ] Per-app window restoration rules
 
 For detailed development plans, see [CHANGELOG.md](CHANGELOG.md).
