@@ -120,6 +120,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowPositions: [String: [String: CGRect]] = [:]
     private var snapshotTimer: Timer?
     
+    // ディスプレイ変更の落ち着き待ちタイマー
+    private var displayStabilizationTimer: Timer?
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         // グローバル参照を設定
         globalAppDelegate = self
@@ -406,13 +409,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("🖥️ ディスプレイ構成が変更されました")
         debugPrint("現在の画面数: \(NSScreen.screens.count)")
         
-        // 設定から遅延時間を取得
-        let delay = WindowTimingSettings.shared.windowRestoreDelay
-        debugPrint("ウィンドウ復元遅延: \(delay)秒")
+        // 既存の落ち着き待ちタイマーをキャンセル
+        displayStabilizationTimer?.invalidate()
         
-        // 少し待ってからウィンドウを復元(ディスプレイの初期化を待つ)
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            self?.restoreWindowsIfNeeded()
+        // 設定から遅延時間を取得
+        let stabilizationDelay = WindowTimingSettings.shared.displayStabilizationDelay
+        
+        // ディスプレイ変更が落ち着くまで待つ(連続イベント対策)
+        displayStabilizationTimer = Timer.scheduledTimer(withTimeInterval: stabilizationDelay, repeats: false) { [weak self] _ in
+            debugPrint("✅ ディスプレイ変更が落ち着きました(待機: \(stabilizationDelay)秒)")
+            
+            // さらにmacOSがウィンドウ座標を更新し終わるまで待つ
+            let restoreDelay = WindowTimingSettings.shared.windowRestoreDelay
+            debugPrint("ウィンドウ復元遅延: \(restoreDelay)秒")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelay) { [weak self] in
+                self?.restoreWindowsIfNeeded()
+            }
         }
     }
     
@@ -581,12 +594,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     debugPrint("      メイン画面: \(mainScreen.frame)")
                     
                     // メイン画面にあるウィンドウのみを復元対象とする
-                    if !mainScreen.frame.intersects(currentFrame) {
-                        debugPrint("      ❌ メイン画面にない(スキップ)")
+                    // より確実な判定: ウィンドウのX座標がメイン画面の範囲内にあるか
+                    let isOnMainScreen = currentFrame.origin.x >= mainScreen.frame.origin.x &&
+                                        currentFrame.origin.x < (mainScreen.frame.origin.x + mainScreen.frame.width)
+                    
+                    if !isOnMainScreen {
+                        debugPrint("      ❌ メイン画面にない(スキップ) - X座標: \(currentFrame.origin.x)")
                         continue
                     }
                     
-                    debugPrint("      ✓ メイン画面にある")
+                    debugPrint("      ✓ メイン画面にある - X座標: \(currentFrame.origin.x)")
                     
                     // Accessibility APIでウィンドウを移動
                     let appRef = AXUIElementCreateApplication(ownerPID)

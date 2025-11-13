@@ -51,6 +51,7 @@ class WindowTimingSettings: ObservableObject {
     
     private let defaults = UserDefaults.standard
     private let windowDelayKey = "windowRestoreDelay"
+    private let displayStabilizationKey = "displayStabilizationDelay"
     
     @Published var windowRestoreDelay: Double {
         didSet {
@@ -58,9 +59,17 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
+    @Published var displayStabilizationDelay: Double {
+        didSet {
+            defaults.set(displayStabilizationDelay, forKey: displayStabilizationKey)
+        }
+    }
+    
     private init() {
-        // デフォルト値は1.5秒
-        self.windowRestoreDelay = defaults.object(forKey: windowDelayKey) as? Double ?? 1.5
+        // デフォルト値: ディスプレイ接続後の待機時間は2.5秒
+        self.windowRestoreDelay = defaults.object(forKey: windowDelayKey) as? Double ?? 2.5
+        // デフォルト値: ディスプレイ変更の落ち着き待ち時間は0.5秒
+        self.displayStabilizationDelay = defaults.object(forKey: displayStabilizationKey) as? Double ?? 0.5
     }
 }
 
@@ -117,21 +126,46 @@ struct SettingsView: View {
                 Text("ウィンドウ復元タイミング")
                     .font(.headline)
                 
-                HStack {
-                    Text("ディスプレイ接続後の待機時間:")
-                        .font(.subheadline)
-                    Spacer()
-                    Text(String(format: "%.1f秒", timingSettings.windowRestoreDelay))
-                        .foregroundColor(.blue)
-                        .fontWeight(.semibold)
+                // ディスプレイ変更の落ち着き待ち時間
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("ディスプレイ変更検出の安定化時間:")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(String(format: "%.1f秒", timingSettings.displayStabilizationDelay))
+                            .foregroundColor(.blue)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Slider(value: $timingSettings.displayStabilizationDelay, in: 0.1...3.0, step: 0.1)
+                    
+                    Text("サスペンド復帰時など、ディスプレイ変更イベントが連続して発生した際に、変更が落ち着くまで待つ時間です。復元処理が早すぎる場合は、この値を大きくしてください。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(.bottom, 8)
                 
-                Slider(value: $timingSettings.windowRestoreDelay, in: 0.1...10.0, step: 0.1)
+                Divider()
                 
-                Text("外部ディスプレイを接続した際に、ウィンドウを復元するまでの待機時間です。画面切り替えがスムーズにいかない場合は、この値を大きくしてください。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                // ディスプレイ接続後の待機時間
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("ディスプレイ接続後の待機時間:")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(String(format: "%.1f秒", timingSettings.windowRestoreDelay))
+                            .foregroundColor(.blue)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Slider(value: $timingSettings.windowRestoreDelay, in: 0.1...10.0, step: 0.1)
+                    
+                    Text("外部ディスプレイを接続した際に、macOSがウィンドウ座標を更新し終わるまでの待機時間です。ウィンドウが正しく復元されない場合は、この値を大きくしてください。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding()
             .background(Color.gray.opacity(0.1))
@@ -147,7 +181,8 @@ struct SettingsView: View {
                     settings.useOption = true
                     settings.useShift = false
                     settings.useCommand = true
-                    timingSettings.windowRestoreDelay = 1.5
+                    timingSettings.displayStabilizationDelay = 0.5
+                    timingSettings.windowRestoreDelay = 2.5
                 }
                 
                 Spacer()
@@ -160,6 +195,6 @@ struct SettingsView: View {
             .padding(.bottom)
         }
         .padding()
-        .frame(width: 500, height: 600)
+        .frame(width: 500, height: 650)
     }
 }
