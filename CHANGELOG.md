@@ -29,6 +29,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for more than 2 displays
 - Configurable snapshot interval
 
+## [1.2.1] - 2025-11-15
+
+### Added
+- Extended timing configuration range to 15 seconds for slower display hardware
+  - Both stabilization and restore delays now configurable from 0.1s to 15.0s
+  - Enables support for wide range of display types and connection methods
+- Current time display in About dialog
+  - Shows real-time timestamp for debugging and version verification
+  - Helps correlate app behavior with system logs
+
+### Changed
+- **Default timing values significantly increased for better reliability**
+  - Display stabilization delay: 0.5s → 6.0s (default)
+  - Window restore delay: 2.5s → 6.0s (default)
+  - Total default wait time: 12 seconds (provides maximum compatibility)
+- Simplified display change event handling
+  - Replaced Timer-based approach with DispatchWorkItem
+  - Prevents RunLoop interference with system processes
+  - Cleaner cancellation of pending operations
+
+### Fixed
+- Duplicate window restoration attempts during rapid display changes
+  - Previous implementation could schedule multiple restoration tasks
+  - Now properly cancels pending tasks when new events arrive
+  - Reduces unnecessary processing and system load
+
+### Known Issues
+- **Dock menu misalignment after sleep/wake** (investigating)
+  - Affects some macOS configurations during sleep/wake cycles
+  - Does NOT affect window restoration functionality
+  - Workaround: Run `killall Dock` in Terminal to reset
+  - Root cause appears to be macOS-level interaction, not WindowSmartMover code
+  - Issue does not occur in v1.1.0
+  - Users requiring stable Dock behavior may prefer v1.1.0 until resolved
+
+### Technical Details
+- Removed `displayStabilizationTimer?.invalidate()` pattern
+- Implemented `DispatchWorkItem` with explicit cancellation
+- Maintains single restoration execution per display change sequence
+- AboutView now uses `DateFormatter` for real-time display
+
+### Migration Notes
+- Users upgrading from v1.2.0 will notice longer default delays
+- Previous custom settings are preserved during upgrade
+- To use new defaults: Settings → "Reset to Defaults"
+- Faster displays can reduce delays to 3-5 seconds if desired
+
 ## [1.2.0] - 2025-11-13
 
 ### Added

@@ -180,11 +180,41 @@ open WindowSmartMover.xcodeproj
 - **Display Management**: CoreGraphics (CGWindow, NSScreen)
 - **Hotkey Registration**: Carbon Event Manager
 
-## Known Limitations
+## Known Issues
 
+### Window Management
 - Some apps (e.g., system preferences) may not support window movement via Accessibility API
 - Fullscreen windows cannot be moved
-- Display reconnection timing may vary by hardware (1.5-2s stabilization delay)
+- Display reconnection timing may vary by hardware
+
+### Display & Sleep/Wake (v1.2.0+)
+- **Dock menu misalignment after sleep/wake** (investigating)
+  - **Symptoms**: Menu appears offset from Dock icons after waking from sleep with external displays
+  - **Impact**: Visual only - does not affect window restoration or app functionality
+  - **Affected versions**: v1.2.0 and later
+  - **Workaround**: Run `killall Dock` in Terminal to immediately reset
+  - **Alternative**: Use v1.1.0 if Dock stability is critical
+  - **Status**: Root cause under investigation - appears to be macOS-level interaction
+  - See GitHub Issues for updates
+
+### Display Timing Recommendations
+
+Default settings (12 second total delay) work for most users, but you can optimize:
+
+**For fast USB-C displays:**
+- Display stabilization: 2-3 seconds
+- Window restore delay: 3-4 seconds
+- Total: 5-7 seconds
+
+**For slower HDMI/DisplayPort:**
+- Display stabilization: 6-8 seconds
+- Window restore delay: 6-8 seconds  
+- Total: 12-16 seconds
+
+**If windows don't restore properly:**
+- Increase both values by 2-3 seconds
+- Check Debug Log for timing details
+- Report your hardware setup in issues
 
 ## Troubleshooting
 
