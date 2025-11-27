@@ -46,9 +46,18 @@ A lightweight macOS menu bar app for effortless window management across multipl
   - Menu bar commands available
 - **Independent from Auto-Restore**: Works separately from display reconnection
 - **Current Limitations**:
-  - Snapshots cleared when app exits (not persistent yet)
   - Restarted apps cannot be restored (window IDs change)
   - Fullscreen/minimized windows excluded
+
+### Auto Snapshot & Persistence (v1.2.4+)
+- **Automatic Snapshot**: Never forget to save your layout
+  - Initial snapshot taken automatically after app launch (configurable: 0.5-60 min, default 5 min)
+  - Also triggers after external display reconnection
+  - Optional periodic snapshots (configurable: 5 min - 6 hours, default 30 min)
+- **Persistent Storage**: Snapshots survive restarts
+  - Saved to UserDefaults, persists across app/macOS restarts
+  - Clear saved data option in Settings
+  - Last save timestamp displayed
 
 ### Coming Soon (v1.3.0) 🚧
 
@@ -57,7 +66,6 @@ A lightweight macOS menu bar app for effortless window management across multipl
 - **Enhanced Snapshot Features**:
   - Visual/audio notification feedback
   - Multiple snapshot slots with UI selection
-  - Persistent snapshot storage
 - **Internationalization (English UI + Japanese localization)**
   - English as default language
   - Japanese localization
@@ -254,6 +262,12 @@ No sensitive information is logged or transmitted.
 
 ## Roadmap
 
+### Completed (v1.2.4)
+- [x] Automatic snapshot (initial + periodic)
+- [x] Persistent snapshot storage (UserDefaults)
+- [x] Auto-snapshot settings UI
+- [x] Post-display-reconnection snapshot scheduling
+
 ### Completed (v1.2.3)
 - [x] Manual window snapshot & restore (MVP)
 - [x] Save/restore hotkeys (Ctrl+Cmd+↑/↓)
@@ -272,7 +286,6 @@ No sensitive information is logged or transmitted.
 
 ### In Development (v1.3.0)
 - [ ] Enhanced snapshot features (visual/audio feedback, multiple slots)
-- [ ] Persistent snapshot storage
 - [ ] Internationalization (English UI + Japanese localization)
 - [ ] Localized debug logs
 

@@ -11,8 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Manual Window Snapshot & Restore**: Enhanced features
   - Visual notification feedback (screen flash, sound)
   - Multiple snapshot slots with UI selection
-  - Persistent snapshot storage (UserDefaults)
-  - Clear saved snapshot option
   - Snapshot management interface (list, delete, rename)
 - **Internationalization (i18n)**
   - English as default UI language
@@ -23,7 +21,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-app window restoration rules
 - Window size restoration (currently position only)
 - Support for more than 2 displays
-- Configurable snapshot interval
+
+## [1.2.4] - 2025-11-27
+
+### Added
+- **Automatic Snapshot Feature**
+  - Initial auto-snapshot after app launch or display recognition (configurable: 0.5-60 min, default 5 min)
+  - Optional periodic auto-snapshot (configurable: 5-360 min / 6 hours, default 30 min)
+  - Settings UI for all auto-snapshot configurations
+- **Snapshot Persistence** (UserDefaults)
+  - Snapshots now survive app restarts and macOS reboots
+  - Automatic loading of saved snapshots on app launch
+  - Clear saved snapshot option in Settings
+  - Timestamp display showing last save time
+- **Display Memory Interval Setting**
+  - Configurable window position monitoring interval (1-30 sec, default 5 sec)
+  - Used for automatic window restoration on display reconnection
+  - Real-time update without app restart
+
+### Changed
+- Settings window height increased to accommodate new sections
+- Snapshot save now automatically persists to UserDefaults
+- Improved log messages to distinguish between different snapshot systems:
+  - "ディスプレイ記憶用の定期監視" for display reconnection restoration
+  - "自動スナップショット" for user-triggered manual restoration
+- Timer implementation changed to RunLoop `.common` mode for reliability
+
+### Technical Details
+- Added `SnapshotSettings` class for auto-snapshot configuration management
+- Added `ManualSnapshotStorage` class for snapshot persistence using JSON encoding
+- Added `displayMemoryInterval` to `WindowTimingSettings` class
+- Implemented `initialSnapshotTimer` and `periodicSnapshotTimer` for auto-snapshot scheduling
+- Added `schedulePostDisplayConnectionSnapshot()` for post-display-reconnection snapshots
+- Added `restartDisplayMemoryTimer()` for real-time interval changes
+- Snapshot data structure: `[[String: [String: CGRect]]]` encoded as JSON in UserDefaults
+
+### Migration Notes
+- Existing users: No action required, snapshots from v1.2.3 were memory-only
+- New default behavior: Auto-snapshot 5 minutes after launch (can be disabled by setting interval)
 
 ## [1.2.3] - 2025-11-26
 
@@ -36,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Independent from automatic display reconnection restoration
 
 ### Limitations
-- Snapshots are stored in memory only and cleared when app exits
+- ~~Snapshots are stored in memory only and cleared when app exits~~ (Fixed in v1.2.4)
 - Windows that have been restarted cannot be restored (CGWindowID changes)
 - Fullscreen and minimized windows are not included in snapshots
 

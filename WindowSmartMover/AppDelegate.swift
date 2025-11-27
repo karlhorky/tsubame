@@ -130,6 +130,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var manualSnapshots: [[String: [String: CGRect]]] = Array(repeating: [:], count: 5)
     private var currentSlotIndex: Int = 0  // v1.2.3では常に0
     
+    // 自動スナップショット機能
+    private var initialSnapshotTimer: Timer?
+    private var periodicSnapshotTimer: Timer?
+    private var hasInitialSnapshotBeenTaken = false
+    
     // ディスプレイ変更の落ち着き待ちタイマー
     private var displayStabilizationTimer: Timer?
     
@@ -158,6 +163,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // WindowTimingSettingsを初期化してスリープ監視を開始
         _ = WindowTimingSettings.shared
         
+        // SnapshotSettingsを初期化
+        _ = SnapshotSettings.shared
+        
+        // 保存済みスナップショットを読み込み
+        loadSavedSnapshots()
+        
         // システムバーにアイコンを追加
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
@@ -181,8 +192,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 監視停止/再開の通知を設定
         setupMonitoringControlObservers()
         
-        // 定期スナップショットを開始(5秒ごと)
+        // スナップショット設定変更の監視を設定
+        setupSnapshotSettingsObservers()
+        
+        // ディスプレイ記憶用の定期監視を開始
         startPeriodicSnapshot()
+        
+        // 初回自動スナップショットタイマーを開始
+        startInitialSnapshotTimer()
         
         debugPrint("アプリが起動しました")
         debugPrint("接続されている画面数: \(NSScreen.screens.count)")
@@ -564,6 +581,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let workItem = DispatchWorkItem { [weak self] in
             self?.restoreWindowsIfNeeded()
+            
+            // 外部ディスプレイ認識後のスナップショットをスケジュール
+            self?.schedulePostDisplayConnectionSnapshot()
         }
         
         restoreWorkItem = workItem
@@ -600,12 +620,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return "\(appName)_\(windowID)"
     }
     
-    /// 定期スナップショットを開始
+    /// ディスプレイ記憶用の定期監視を開始
     private func startPeriodicSnapshot() {
-        snapshotTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        let interval = WindowTimingSettings.shared.displayMemoryInterval
+        snapshotTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.takeWindowSnapshot()
         }
-        debugPrint("✅ 定期スナップショットを開始しました(5秒間隔)")
+        debugPrint("✅ ディスプレイ記憶用の定期監視を開始しました（\(Int(interval))秒間隔）")
     }
     
     /// 現在のウィンドウ配置のスナップショットを取得
@@ -706,6 +727,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         manualSnapshots[currentSlotIndex] = snapshot
+        
+        // 永続化
+        ManualSnapshotStorage.shared.save(manualSnapshots)
+        
         debugPrint("📸 スナップショット保存完了: \(savedCount)個のウィンドウ")
     }
     
@@ -951,6 +976,232 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("✅ 合計 \(restoredCount)個のウィンドウを復元しました\n")
     }
     
+    // MARK: - 自動スナップショット機能
+    
+    /// 保存済みスナップショットを読み込み
+    private func loadSavedSnapshots() {
+        if let savedSnapshots = ManualSnapshotStorage.shared.load() {
+            // スロット数を確認して調整
+            for (index, snapshot) in savedSnapshots.enumerated() {
+                if index < manualSnapshots.count {
+                    manualSnapshots[index] = snapshot
+                }
+            }
+            
+            // 保存されているウィンドウ数をカウント
+            var totalWindows = 0
+            for snapshot in manualSnapshots {
+                for (_, windows) in snapshot {
+                    totalWindows += windows.count
+                }
+            }
+            
+            if totalWindows > 0 {
+                debugPrint("💾 保存済みスナップショットを読み込みました: \(totalWindows)個のウィンドウ")
+            }
+        } else {
+            debugPrint("💾 保存済みスナップショットはありません")
+        }
+    }
+    
+    /// スナップショット設定変更の監視を設定
+    private func setupSnapshotSettingsObservers() {
+        // 設定変更の通知を監視
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("SnapshotSettingsChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.restartPeriodicSnapshotTimerIfNeeded()
+        }
+        
+        // スナップショットクリアの通知を監視
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("ClearManualSnapshot"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.clearManualSnapshots()
+        }
+        
+        // ディスプレイ記憶用監視間隔変更の通知を監視
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("DisplayMemoryIntervalChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.restartDisplayMemoryTimer()
+        }
+    }
+    
+    /// ディスプレイ記憶用タイマーを再起動
+    private func restartDisplayMemoryTimer() {
+        snapshotTimer?.invalidate()
+        let interval = WindowTimingSettings.shared.displayMemoryInterval
+        snapshotTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            self?.takeWindowSnapshot()
+        }
+        debugPrint("🔄 ディスプレイ記憶用の監視間隔を変更しました（\(Int(interval))秒間隔）")
+    }
+    
+    /// 手動スナップショットをクリア
+    private func clearManualSnapshots() {
+        manualSnapshots = Array(repeating: [:], count: 5)
+        debugPrint("🗑️ メモリ上のスナップショットをクリアしました")
+    }
+    
+    /// 初回自動スナップショットタイマーを開始
+    private func startInitialSnapshotTimer() {
+        let settings = SnapshotSettings.shared
+        let delaySeconds = settings.initialDelaySeconds
+        
+        debugPrint("⏱️ 初回自動スナップショットタイマーを開始: \(String(format: "%.1f", delaySeconds/60))分後")
+        
+        // 既存のタイマーをキャンセル
+        initialSnapshotTimer?.invalidate()
+        initialSnapshotTimer = nil
+        
+        // Timer を .common モードで RunLoop に追加（UI操作中も動作）
+        let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
+            debugPrint("⏱️ 初回自動スナップショットタイマーが発火しました")
+            self?.performAutoSnapshot(reason: "初回自動")
+            self?.hasInitialSnapshotBeenTaken = true
+            
+            // 定期スナップショットが有効なら開始
+            let snapshotSettings = SnapshotSettings.shared
+            if snapshotSettings.enablePeriodicSnapshot {
+                self?.startPeriodicSnapshotTimer()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        initialSnapshotTimer = timer
+    }
+    
+    /// 定期スナップショットタイマーを開始
+    private func startPeriodicSnapshotTimer() {
+        let settings = SnapshotSettings.shared
+        
+        guard settings.enablePeriodicSnapshot else {
+            debugPrint("⏱️ 定期スナップショットは無効です")
+            return
+        }
+        
+        let intervalSeconds = settings.periodicIntervalSeconds
+        
+        debugPrint("⏱️ 定期スナップショットタイマーを開始: \(String(format: "%.0f", intervalSeconds/60))分間隔")
+        
+        // 既存のタイマーをキャンセル
+        periodicSnapshotTimer?.invalidate()
+        periodicSnapshotTimer = nil
+        
+        // Timer を .common モードで RunLoop に追加（UI操作中も動作）
+        let timer = Timer(timeInterval: intervalSeconds, repeats: true) { [weak self] _ in
+            debugPrint("⏱️ 定期スナップショットタイマーが発火しました")
+            self?.performAutoSnapshot(reason: "定期自動")
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        periodicSnapshotTimer = timer
+    }
+    
+    /// 定期スナップショットタイマーを再設定（設定変更時）
+    private func restartPeriodicSnapshotTimerIfNeeded() {
+        let settings = SnapshotSettings.shared
+        
+        periodicSnapshotTimer?.invalidate()
+        periodicSnapshotTimer = nil
+        
+        if settings.enablePeriodicSnapshot && hasInitialSnapshotBeenTaken {
+            startPeriodicSnapshotTimer()
+        } else if !settings.enablePeriodicSnapshot {
+            debugPrint("⏱️ 定期スナップショットを停止しました")
+        }
+    }
+    
+    /// 自動スナップショットを実行
+    private func performAutoSnapshot(reason: String) {
+        debugPrint("📸 \(reason)スナップショットを取得中...")
+        
+        let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
+        guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            debugPrint("  ❌ ウィンドウリストの取得に失敗")
+            return
+        }
+        
+        let screens = NSScreen.screens
+        var snapshot: [String: [String: CGRect]] = [:]
+        
+        // 画面ごとに初期化
+        for screen in screens {
+            let displayID = getDisplayIdentifier(for: screen)
+            snapshot[displayID] = [:]
+        }
+        
+        var savedCount = 0
+        
+        // 全ウィンドウを記録
+        for window in windowList {
+            guard let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
+                  let boundsDict = window[kCGWindowBounds as String] as? [String: CGFloat],
+                  let ownerName = window[kCGWindowOwnerName as String] as? String,
+                  let cgWindowID = window[kCGWindowNumber as String] as? CGWindowID else {
+                continue
+            }
+            
+            let frame = CGRect(
+                x: boundsDict["X"] ?? 0,
+                y: boundsDict["Y"] ?? 0,
+                width: boundsDict["Width"] ?? 0,
+                height: boundsDict["Height"] ?? 0
+            )
+            
+            let windowID = getWindowIdentifier(appName: ownerName, windowID: cgWindowID)
+            
+            // このウィンドウがどの画面にあるか判定
+            for screen in screens {
+                if screen.frame.intersects(frame) {
+                    let displayID = getDisplayIdentifier(for: screen)
+                    snapshot[displayID]?[windowID] = frame
+                    savedCount += 1
+                    break
+                }
+            }
+        }
+        
+        manualSnapshots[currentSlotIndex] = snapshot
+        
+        // 永続化
+        ManualSnapshotStorage.shared.save(manualSnapshots)
+        
+        debugPrint("📸 \(reason)スナップショット完了: \(savedCount)個のウィンドウ")
+    }
+    
+    /// 外部ディスプレイ認識安定後のスナップショットタイマーを開始
+    func schedulePostDisplayConnectionSnapshot() {
+        let settings = SnapshotSettings.shared
+        let delaySeconds = settings.initialDelaySeconds
+        
+        debugPrint("⏱️ ディスプレイ認識後スナップショット: \(String(format: "%.1f", delaySeconds/60))分後に予定")
+        
+        // 既存の初回タイマーをキャンセルして新しく設定
+        initialSnapshotTimer?.invalidate()
+        initialSnapshotTimer = nil
+        
+        // Timer を .common モードで RunLoop に追加（UI操作中も動作）
+        let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
+            debugPrint("⏱️ ディスプレイ認識後スナップショットタイマーが発火しました")
+            self?.performAutoSnapshot(reason: "ディスプレイ認識後自動")
+            self?.hasInitialSnapshotBeenTaken = true
+            
+            // 定期スナップショットが有効で、まだ開始していなければ開始
+            let snapshotSettings = SnapshotSettings.shared
+            if snapshotSettings.enablePeriodicSnapshot && self?.periodicSnapshotTimer == nil {
+                self?.startPeriodicSnapshotTimer()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        initialSnapshotTimer = timer
+    }
+    
     
     deinit {
         // ホットキーの登録解除
@@ -971,6 +1222,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // タイマーの停止
         snapshotTimer?.invalidate()
+        initialSnapshotTimer?.invalidate()
+        periodicSnapshotTimer?.invalidate()
     }
 }
 

@@ -53,6 +53,7 @@ class WindowTimingSettings: ObservableObject {
     private let windowDelayKey = "windowRestoreDelay"
     private let displayStabilizationKey = "displayStabilizationDelay"
     private let disableMonitoringKey = "disableMonitoringDuringSleep"
+    private let displayMemoryIntervalKey = "displayMemoryInterval"
     
     @Published var windowRestoreDelay: Double {
         didSet {
@@ -72,6 +73,18 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
+    /// ディスプレイ記憶用の監視間隔（秒）: 1-30秒、デフォルト5秒
+    @Published var displayMemoryInterval: Double {
+        didSet {
+            defaults.set(displayMemoryInterval, forKey: displayMemoryIntervalKey)
+            // 設定変更を通知
+            NotificationCenter.default.post(
+                name: Notification.Name("DisplayMemoryIntervalChanged"),
+                object: nil
+            )
+        }
+    }
+    
     // スリープ監視関連
     @Published var lastSleepTime: Date?
     @Published var lastWakeTime: Date?
@@ -88,6 +101,8 @@ class WindowTimingSettings: ObservableObject {
         self.displayStabilizationDelay = defaults.object(forKey: displayStabilizationKey) as? Double ?? 6.0
         // デフォルト値: スリープ中の監視停止を有効化
         self.disableMonitoringDuringSleep = defaults.object(forKey: disableMonitoringKey) as? Bool ?? true
+        // デフォルト値: ディスプレイ記憶用監視間隔は5.0秒
+        self.displayMemoryInterval = defaults.object(forKey: displayMemoryIntervalKey) as? Double ?? 5.0
         
         // スリープ監視を開始
         startSleepMonitoring()
@@ -176,9 +191,165 @@ class WindowTimingSettings: ObservableObject {
     }
 }
 
+// SnapshotSettings: 自動スナップショット設定
+class SnapshotSettings: ObservableObject {
+    static let shared = SnapshotSettings()
+    
+    private let defaults = UserDefaults.standard
+    private let initialDelayKey = "snapshotInitialDelay"
+    private let enablePeriodicKey = "snapshotEnablePeriodic"
+    private let periodicIntervalKey = "snapshotPeriodicInterval"
+    
+    /// 初回スナップショット遅延（分）: 0.5-60分、デフォルト5分
+    @Published var initialSnapshotDelay: Double {
+        didSet {
+            defaults.set(initialSnapshotDelay, forKey: initialDelayKey)
+        }
+    }
+    
+    /// 定期スナップショット有効化
+    @Published var enablePeriodicSnapshot: Bool {
+        didSet {
+            defaults.set(enablePeriodicSnapshot, forKey: enablePeriodicKey)
+            // 設定変更を通知
+            NotificationCenter.default.post(
+                name: Notification.Name("SnapshotSettingsChanged"),
+                object: nil
+            )
+        }
+    }
+    
+    /// 定期スナップショット間隔（分）: 5-360分、デフォルト30分
+    @Published var periodicSnapshotInterval: Double {
+        didSet {
+            defaults.set(periodicSnapshotInterval, forKey: periodicIntervalKey)
+            // 設定変更を通知
+            NotificationCenter.default.post(
+                name: Notification.Name("SnapshotSettingsChanged"),
+                object: nil
+            )
+        }
+    }
+    
+    private init() {
+        self.initialSnapshotDelay = defaults.object(forKey: initialDelayKey) as? Double ?? 5.0
+        self.enablePeriodicSnapshot = defaults.object(forKey: enablePeriodicKey) as? Bool ?? false
+        self.periodicSnapshotInterval = defaults.object(forKey: periodicIntervalKey) as? Double ?? 30.0
+    }
+    
+    /// 初回遅延を秒単位で取得
+    var initialDelaySeconds: Double {
+        return initialSnapshotDelay * 60.0
+    }
+    
+    /// 定期間隔を秒単位で取得
+    var periodicIntervalSeconds: Double {
+        return periodicSnapshotInterval * 60.0
+    }
+}
+
+// ManualSnapshotStorage: スナップショットの永続化
+class ManualSnapshotStorage {
+    static let shared = ManualSnapshotStorage()
+    
+    private let defaults = UserDefaults.standard
+    private let storageKey = "manualSnapshotData"
+    private let timestampKey = "manualSnapshotTimestamp"
+    
+    private init() {}
+    
+    /// スナップショットを保存
+    func save(_ snapshots: [[String: [String: CGRect]]]) {
+        // CGRectを辞書形式に変換してJSON化
+        var jsonCompatible: [[[String: [String: [String: CGFloat]]]]] = []
+        
+        for slot in snapshots {
+            var slotData: [[String: [String: [String: CGFloat]]]] = []
+            for (displayID, windows) in slot {
+                var windowsData: [String: [String: CGFloat]] = [:]
+                for (windowID, frame) in windows {
+                    windowsData[windowID] = [
+                        "x": frame.origin.x,
+                        "y": frame.origin.y,
+                        "width": frame.size.width,
+                        "height": frame.size.height
+                    ]
+                }
+                slotData.append([displayID: windowsData])
+            }
+            jsonCompatible.append(slotData)
+        }
+        
+        if let data = try? JSONEncoder().encode(jsonCompatible) {
+            defaults.set(data, forKey: storageKey)
+            defaults.set(Date().timeIntervalSince1970, forKey: timestampKey)
+            print("💾 スナップショットを永続化しました")
+        }
+    }
+    
+    /// スナップショットを読み込み
+    func load() -> [[String: [String: CGRect]]]? {
+        guard let data = defaults.data(forKey: storageKey),
+              let jsonCompatible = try? JSONDecoder().decode([[[String: [String: [String: CGFloat]]]]].self, from: data) else {
+            return nil
+        }
+        
+        // 辞書形式からCGRectに変換
+        var snapshots: [[String: [String: CGRect]]] = []
+        
+        for slotData in jsonCompatible {
+            var slot: [String: [String: CGRect]] = [:]
+            for displayDict in slotData {
+                for (displayID, windowsData) in displayDict {
+                    var windows: [String: CGRect] = [:]
+                    for (windowID, frameData) in windowsData {
+                        let frame = CGRect(
+                            x: frameData["x"] ?? 0,
+                            y: frameData["y"] ?? 0,
+                            width: frameData["width"] ?? 0,
+                            height: frameData["height"] ?? 0
+                        )
+                        windows[windowID] = frame
+                    }
+                    slot[displayID] = windows
+                }
+            }
+            snapshots.append(slot)
+        }
+        
+        if let timestamp = defaults.object(forKey: timestampKey) as? Double {
+            let date = Date(timeIntervalSince1970: timestamp)
+            print("💾 保存済みスナップショットを読み込みました（保存日時: \(date)）")
+        }
+        
+        return snapshots
+    }
+    
+    /// 保存日時を取得
+    func getTimestamp() -> Date? {
+        guard let timestamp = defaults.object(forKey: timestampKey) as? Double else {
+            return nil
+        }
+        return Date(timeIntervalSince1970: timestamp)
+    }
+    
+    /// スナップショットをクリア
+    func clear() {
+        defaults.removeObject(forKey: storageKey)
+        defaults.removeObject(forKey: timestampKey)
+        print("🗑️ 永続化されたスナップショットをクリアしました")
+    }
+    
+    /// スナップショットが存在するか
+    var hasSnapshot: Bool {
+        return defaults.data(forKey: storageKey) != nil
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var settings = HotKeySettings.shared
     @ObservedObject var timingSettings = WindowTimingSettings.shared
+    @ObservedObject var snapshotSettings = SnapshotSettings.shared
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -269,6 +440,28 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(.bottom, 8)
+                
+                Divider()
+                
+                // ディスプレイ記憶用監視間隔
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("ウィンドウ位置の監視間隔:")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(String(format: "%.0f秒", timingSettings.displayMemoryInterval))
+                            .foregroundColor(.blue)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Slider(value: $timingSettings.displayMemoryInterval, in: 1.0...30.0, step: 1.0)
+                    
+                    Text("ディスプレイ再接続時の自動復元用に、ウィンドウ位置を記録する間隔です。短いほど正確ですが、CPU負荷が増えます。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding()
             .background(Color.gray.opacity(0.1))
@@ -337,6 +530,100 @@ struct SettingsView: View {
             .background(Color.gray.opacity(0.1))
             .cornerRadius(8)
             
+            // 自動スナップショット設定セクション
+            VStack(alignment: .leading, spacing: 12) {
+                Text("自動スナップショット")
+                    .font(.headline)
+                
+                // 初回スナップショット遅延
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("起動後/ディスプレイ認識後の初回取得:")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(formatMinutes(snapshotSettings.initialSnapshotDelay))
+                            .foregroundColor(.blue)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Slider(value: $snapshotSettings.initialSnapshotDelay, in: 0.5...60.0, step: 0.5)
+                    
+                    Text("アプリ起動後または外部ディスプレイ認識安定後に、自動でスナップショットを取得するまでの時間です。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.bottom, 8)
+                
+                Divider()
+                
+                // 定期スナップショット
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("定期的にスナップショットを自動取得", isOn: $snapshotSettings.enablePeriodicSnapshot)
+                        .toggleStyle(SwitchToggleStyle())
+                    
+                    if snapshotSettings.enablePeriodicSnapshot {
+                        HStack {
+                            Text("取得間隔:")
+                                .font(.subheadline)
+                            Spacer()
+                            Text(formatMinutes(snapshotSettings.periodicSnapshotInterval))
+                                .foregroundColor(.blue)
+                                .fontWeight(.semibold)
+                        }
+                        
+                        Slider(value: $snapshotSettings.periodicSnapshotInterval, in: 5.0...360.0, step: 5.0)
+                        
+                        Text("初回取得後、指定した間隔で自動的にスナップショットを更新します。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.bottom, 8)
+                
+                Divider()
+                
+                // スナップショット情報
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("保存状態")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    
+                    if let timestamp = ManualSnapshotStorage.shared.getTimestamp() {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("最終保存: \(timestamp.formatted(date: .abbreviated, time: .standard))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "xmark.circle")
+                                .foregroundColor(.orange)
+                            Text("保存されたスナップショットはありません")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Button("保存済みスナップショットをクリア") {
+                        ManualSnapshotStorage.shared.clear()
+                        // AppDelegateにクリアを通知
+                        NotificationCenter.default.post(
+                            name: Notification.Name("ClearManualSnapshot"),
+                            object: nil
+                        )
+                    }
+                    .font(.caption)
+                    .disabled(!ManualSnapshotStorage.shared.hasSnapshot)
+                }
+            }
+            .padding()
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(8)
+            
             Text("⚠️ 設定を変更したらアプリを再起動してください")
                 .font(.caption)
                 .foregroundColor(.orange)
@@ -350,6 +637,10 @@ struct SettingsView: View {
                     timingSettings.displayStabilizationDelay = 6.0
                     timingSettings.windowRestoreDelay = 6.0
                     timingSettings.disableMonitoringDuringSleep = true
+                    timingSettings.displayMemoryInterval = 5.0
+                    snapshotSettings.initialSnapshotDelay = 5.0
+                    snapshotSettings.enablePeriodicSnapshot = false
+                    snapshotSettings.periodicSnapshotInterval = 30.0
                 }
                 
                 Spacer()
@@ -362,6 +653,25 @@ struct SettingsView: View {
             .padding(.bottom)
         }
         .padding()
-        .frame(width: 500, height: 980)
+        .frame(width: 500, height: 1280)
+    }
+    
+    // 分単位の時間をフォーマット
+    private func formatMinutes(_ minutes: Double) -> String {
+        if minutes >= 60 {
+            let hours = Int(minutes) / 60
+            let mins = Int(minutes) % 60
+            if mins == 0 {
+                return "\(hours)時間"
+            } else {
+                return "\(hours)時間\(mins)分"
+            }
+        } else {
+            if minutes == Double(Int(minutes)) {
+                return "\(Int(minutes))分"
+            } else {
+                return String(format: "%.1f分", minutes)
+            }
+        }
     }
 }
