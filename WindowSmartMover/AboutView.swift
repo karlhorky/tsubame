@@ -17,75 +17,125 @@ struct AboutView: View {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
     
-    private var currentDateTime: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .medium
-        formatter.locale = Locale(identifier: "ja_JP")
-        return formatter.string(from: Date())
-    }
-    
     private var appName: String {
         Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "WindowSmartMover"
     }
     
+    private let githubURL = "https://github.com/zembutsu/WindowSmartMover"
+    
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             // アイコン
             Image(systemName: "rectangle.2.swap")
-                .font(.system(size: 60))
+                .font(.system(size: 50))
                 .foregroundColor(.blue)
-                .padding(.top, 30)
+                .padding(.top, 20)
             
             // アプリ名
-            Text(appName)
-                .font(.title)
-                .fontWeight(.bold)
+            VStack(spacing: 4) {
+                Text("Tsubame")
+                    .font(.title)
+                    .fontWeight(.bold)
+                Text("Window Smart Mover")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
             
             // バージョン情報
-            VStack(spacing: 8) {
-                HStack {
-                    Text("バージョン:")
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Text("Version")
                         .foregroundColor(.secondary)
                     Text(appVersion)
                         .fontWeight(.semibold)
                 }
                 
-                HStack {
-                    Text("ビルド:")
+                HStack(spacing: 4) {
+                    Text("Build")
                         .foregroundColor(.secondary)
                     Text(buildNumber)
                         .fontWeight(.semibold)
                 }
-                
-                HStack {
-                    Text("ビルド時刻:")
-                        .foregroundColor(.secondary)
-                    Text(currentDateTime)
-                        .fontWeight(.semibold)
-                        .font(.caption)
-                }
             }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(8)
+            .font(.subheadline)
             
-            // 著作権情報
-            VStack(spacing: 4) {
-                Text("© 2025 @zembutsu (Masahito Zembutsu)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Text("マルチディスプレイ環境でウィンドウを簡単に移動")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+            Divider()
+            
+            // ショートカット一覧
+            GroupBox(label: Text("ショートカット").font(.headline)) {
+                VStack(alignment: .leading, spacing: 6) {
+                    let mod = HotKeySettings.shared.getModifierString()
+                    
+                    HStack {
+                        Text("画面間移動")
+                            .frame(width: 90, alignment: .leading)
+                            .font(.subheadline)
+                        Text("\(mod)→ / \(mod)←")
+                            .font(.system(.subheadline, design: .monospaced))
+                            .foregroundColor(.blue)
+                    }
+                    
+                    HStack {
+                        Text("スナップショット")
+                            .frame(width: 90, alignment: .leading)
+                            .font(.subheadline)
+                        Text("\(mod)↑ / \(mod)↓")
+                            .font(.system(.subheadline, design: .monospaced))
+                            .foregroundColor(.blue)
+                    }
+                    
+                    HStack {
+                        Text("位置微調整")
+                            .frame(width: 90, alignment: .leading)
+                            .font(.subheadline)
+                        Text("\(mod)W/A/S/D")
+                            .font(.system(.subheadline, design: .monospaced))
+                            .foregroundColor(.blue)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            
+            // 情報
+            GroupBox(label: Text("情報").font(.headline)) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("開発者")
+                            .frame(width: 70, alignment: .leading)
+                            .font(.subheadline)
+                        Text("Masahito Zembutsu")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("ライセンス")
+                            .frame(width: 70, alignment: .leading)
+                            .font(.subheadline)
+                        Text("MIT License")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("GitHub")
+                            .frame(width: 70, alignment: .leading)
+                            .font(.subheadline)
+                        Link("zembutsu/WindowSmartMover", destination: URL(string: githubURL)!)
+                            .font(.subheadline)
+                    }
+                }
+                .padding(.vertical, 4)
             }
             
             Spacer()
+            
+            // 著作権情報
+            Text("© 2025 @zembutsu")
+                .font(.caption)
+                .foregroundColor(.secondary)
             
             // 閉じるボタン
             Button("OK") {
@@ -94,6 +144,7 @@ struct AboutView: View {
             .keyboardShortcut(.defaultAction)
             .padding(.bottom)
         }
-        .frame(width: 350, height: 420)
+        .padding(.horizontal)
+        .frame(width: 360, height: 520)
     }
 }

@@ -78,8 +78,8 @@ A lightweight macOS menu bar app for effortless window management across multipl
 ⚠️ **Note**: These features are under active development.
 
 - **Enhanced Snapshot Features**:
-  - Visual/audio notification feedback
   - Multiple snapshot slots with UI selection
+  - Snapshot management interface (list, rename, delete)
 - **Internationalization (English UI + Japanese localization)**
   - English as default language
   - Japanese localization
@@ -285,6 +285,11 @@ No sensitive information is logged or transmitted.
 - [x] Settings UI improved with Steppers
 - [x] Settings UI reorganized with Basic/Advanced tabs
 - [x] Existing data protection (prevents overwrite with low window count)
+- [x] Sound notification with selectable system sounds (13 options + preview)
+- [x] System notification support (optional)
+- [x] Enhanced menu bar with snapshot status
+- [x] Enhanced About window ("Tsubame" branding, shortcuts reference)
+- [x] Automated version management (VERSION file + git commit count)
 
 ### Completed (v1.2.3)
 - [x] Manual window snapshot & restore (MVP)
@@ -303,15 +308,16 @@ No sensitive information is logged or transmitted.
 - [x] Debug log viewer with copy functionality
 
 ### In Development (v1.3.0)
-- [ ] Enhanced snapshot features (visual/audio feedback, multiple slots)
+- [ ] Enhanced snapshot features (multiple slots with UI selection)
+- [ ] Snapshot management interface (list, rename, delete)
 - [ ] Internationalization (English UI + Japanese localization)
 - [ ] Localized debug logs
 
 ### Future Considerations (Post v1.3.0)
-- [ ] Snapshot management interface
 - [ ] Window size restoration (currently position only)
 - [ ] Support for more than 2 displays
 - [ ] Per-app window restoration rules
+- [ ] Export/Import snapshots as JSON
 
 For detailed development plans, see [CHANGELOG.md](CHANGELOG.md).
 

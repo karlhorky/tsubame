@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-app window restoration rules
 - Window size restoration (currently position only)
 - Support for more than 2 displays
+- Export/Import snapshots as JSON
 
 ## [1.2.4] - 2025-11-27
 
@@ -46,6 +47,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Move focused window by configurable pixels (10-500 px, default 100 px)
   - Keyboard shortcuts: `⌃⌘W` (up), `⌃⌘A` (left), `⌃⌘S` (down), `⌃⌘D` (right)
   - Eliminates need for trackpad/mouse for fine positioning after screen moves
+- **Sound Notification**
+  - System sound plays on snapshot save/restore (configurable)
+  - Selectable from 13 macOS system sounds (Blow, Glass, Ping, etc.)
+  - Preview button to test selected sound
+- **System Notification**
+  - Optional notification center alerts for snapshot operations
+  - Shows window count in notification body
+- **Enhanced Menu Bar**
+  - Displays snapshot status (window count and last save time)
+  - Auto-updates after save operations
+- **Enhanced About Window**
+  - App name displayed as "Tsubame - Window Smart Mover"
+  - Version and build info (auto-generated)
+  - Keyboard shortcuts reference
+  - Developer credits and license info
+  - GitHub link
+- **Automated Version Management**
+  - VERSION file for centralized version control
+  - Build number auto-generated from git commit count
+  - Xcode Build Phase script integration
 
 ### Changed
 - **Settings UI reorganized with tabs**
@@ -66,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Registered hotKeyRef5-8 for W/A/S/D keys
 - Settings UI uses `GroupBox` and `Picker` for tab navigation
 - Snapshot protection logic in `performAutoSnapshot()`
+- Added `VERSION` file for centralized version management
+- Build number auto-generated from git commit count via Xcode Build Phase script
 
 ### Migration Notes
 - Existing users: No action required, snapshots from v1.2.3 were memory-only

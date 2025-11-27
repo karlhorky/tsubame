@@ -1,6 +1,7 @@
 import SwiftUI
 import Carbon
 import Combine
+import AppKit
 
 class HotKeySettings: ObservableObject {
     static let shared = HotKeySettings()
@@ -254,6 +255,37 @@ class SnapshotSettings: ObservableObject {
     
     private let protectExistingKey = "snapshotProtectExisting"
     private let minimumWindowCountKey = "snapshotMinimumWindowCount"
+    private let enableSoundKey = "snapshotEnableSound"
+    private let enableNotificationKey = "snapshotEnableNotification"
+    private let soundNameKey = "snapshotSoundName"
+    
+    /// 利用可能なシステムサウンド
+    static let availableSounds = [
+        "Blow", "Bottle", "Frog", "Funk", "Glass",
+        "Hero", "Morse", "Ping", "Pop", "Purr",
+        "Sosumi", "Submarine", "Tink"
+    ]
+    
+    /// サウンド通知有効化
+    @Published var enableSound: Bool {
+        didSet {
+            defaults.set(enableSound, forKey: enableSoundKey)
+        }
+    }
+    
+    /// 通知サウンド名
+    @Published var soundName: String {
+        didSet {
+            defaults.set(soundName, forKey: soundNameKey)
+        }
+    }
+    
+    /// システム通知有効化
+    @Published var enableNotification: Bool {
+        didSet {
+            defaults.set(enableNotification, forKey: enableNotificationKey)
+        }
+    }
     
     private init() {
         self.initialSnapshotDelay = defaults.object(forKey: initialDelayKey) as? Double ?? 15.0
@@ -261,6 +293,14 @@ class SnapshotSettings: ObservableObject {
         self.periodicSnapshotInterval = defaults.object(forKey: periodicIntervalKey) as? Double ?? 30.0
         self.protectExistingSnapshot = defaults.object(forKey: protectExistingKey) as? Bool ?? true
         self.minimumWindowCount = defaults.object(forKey: minimumWindowCountKey) as? Int ?? 3
+        self.enableSound = defaults.object(forKey: enableSoundKey) as? Bool ?? true
+        self.soundName = defaults.object(forKey: soundNameKey) as? String ?? "Blow"
+        self.enableNotification = defaults.object(forKey: enableNotificationKey) as? Bool ?? false
+    }
+    
+    /// サウンドをプレビュー再生
+    func previewSound() {
+        NSSound(named: NSSound.Name(soundName))?.play()
     }
     
     /// 初回遅延を秒単位で取得
@@ -578,6 +618,37 @@ struct SettingsView: View {
                     
                     Divider()
                     
+                    // 通知設定
+                    Text("通知")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    HStack {
+                        Toggle("サウンド", isOn: $snapshotSettings.enableSound)
+                        Toggle("システム通知", isOn: $snapshotSettings.enableNotification)
+                    }
+                    
+                    if snapshotSettings.enableSound {
+                        HStack {
+                            Text("サウンド:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Picker("", selection: $snapshotSettings.soundName) {
+                                ForEach(SnapshotSettings.availableSounds, id: \.self) { sound in
+                                    Text(sound).tag(sound)
+                                }
+                            }
+                            .frame(width: 120)
+                            
+                            Button("♪") {
+                                snapshotSettings.previewSound()
+                            }
+                            .help("プレビュー再生")
+                        }
+                    }
+                    
+                    Divider()
+                    
                     // 保存状態
                     HStack {
                         if let timestamp = ManualSnapshotStorage.shared.getTimestamp() {
@@ -730,6 +801,9 @@ struct SettingsView: View {
         snapshotSettings.periodicSnapshotInterval = 30.0
         snapshotSettings.protectExistingSnapshot = true
         snapshotSettings.minimumWindowCount = 3
+        snapshotSettings.enableSound = true
+        snapshotSettings.soundName = "Blow"
+        snapshotSettings.enableNotification = false
     }
     
     private func formatMinutes(_ minutes: Double) -> String {

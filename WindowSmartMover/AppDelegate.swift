@@ -1,6 +1,7 @@
 import Cocoa
 import Carbon
 import SwiftUI
+import UserNotifications
 
 // グローバル変数としてAppDelegateの参照を保持
 private var globalAppDelegate: AppDelegate?
@@ -181,6 +182,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 保存済みスナップショットを読み込み
         loadSavedSnapshots()
         
+        // 通知権限をリクエスト
+        setupNotifications()
+        
         // システムバーにアイコンを追加
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
@@ -217,6 +221,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("接続されている画面数: \(NSScreen.screens.count)")
     }
     
+    /// 通知センターのセットアップ
+    private func setupNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if granted {
+                debugPrint("✅ 通知権限が許可されました")
+            } else if let error = error {
+                debugPrint("⚠️ 通知権限のリクエストに失敗: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// 通知を送信（スナップショット操作用）
+    private func sendNotification(title: String, body: String) {
+        let settings = SnapshotSettings.shared
+        
+        // サウンド通知
+        if settings.enableSound {
+            NSSound(named: NSSound.Name(settings.soundName))?.play()
+        }
+        
+        // システム通知
+        guard settings.enableNotification else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = nil  // サウンドは別途制御
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                debugPrint("⚠️ 通知送信エラー: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     func setupMenu() {
         let menu = NSMenu()
         
@@ -224,17 +270,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "ウィンドウを次の画面へ (\(modifierString)→)", action: #selector(moveWindowToNextScreen), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "ウィンドウを前の画面へ (\(modifierString)←)", action: #selector(moveWindowToPrevScreen), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+        
+        // スナップショット操作
         menu.addItem(NSMenuItem(title: "📸 配置を保存 (\(modifierString)↑)", action: #selector(saveManualSnapshot), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "📥 配置を復元 (\(modifierString)↓)", action: #selector(restoreManualSnapshot), keyEquivalent: ""))
+        
+        // スナップショット状態
+        let snapshotStatusItem = NSMenuItem(title: getSnapshotStatusString(), action: nil, keyEquivalent: "")
+        snapshotStatusItem.isEnabled = false
+        menu.addItem(snapshotStatusItem)
+        
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "設定...", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "デバッグログを表示", action: #selector(showDebugLog), keyEquivalent: "d"))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "About WindowSmartMover", action: #selector(openAbout), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "About Tsubame", action: #selector(openAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         
         statusItem?.menu = menu
+    }
+    
+    /// スナップショット状態の文字列を生成
+    private func getSnapshotStatusString() -> String {
+        if let timestamp = ManualSnapshotStorage.shared.getTimestamp() {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            let timeStr = formatter.string(from: timestamp)
+            
+            // 保存されているウィンドウ数をカウント
+            let snapshot = manualSnapshots[currentSlotIndex]
+            let windowCount = snapshot.values.reduce(0) { $0 + $1.count }
+            
+            return "    💾 \(windowCount)個 @ \(timeStr)"
+        } else {
+            return "    💾 データなし"
+        }
     }
     
     @objc func openSettings() {
@@ -261,7 +332,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let hostingController = NSHostingController(rootView: aboutView)
             
             let window = NSWindow(contentViewController: hostingController)
-            window.title = "About WindowSmartMover"
+            window.title = "About Tsubame - Window Smart Mover"
             window.styleMask = [.titled, .closable]
             window.center()
             window.level = .floating
@@ -863,6 +934,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ManualSnapshotStorage.shared.save(manualSnapshots)
         
         debugPrint("📸 スナップショット保存完了: \(savedCount)個のウィンドウ")
+        
+        // 通知
+        sendNotification(
+            title: "スナップショット保存",
+            body: "\(savedCount)個のウィンドウ位置を保存しました"
+        )
+        
+        // メニューを更新
+        setupMenu()
     }
     
     /// 手動スナップショットを復元
@@ -957,6 +1037,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         debugPrint("📥 スナップショット復元完了: \(restoredCount)個のウィンドウを移動")
+        
+        // 通知
+        if restoredCount > 0 {
+            sendNotification(
+                title: "スナップショット復元",
+                body: "\(restoredCount)個のウィンドウ位置を復元しました"
+            )
+        } else {
+            sendNotification(
+                title: "スナップショット復元",
+                body: "復元対象のウィンドウがありませんでした"
+            )
+        }
     }
     
     /// 必要に応じてウィンドウを復元
@@ -1313,6 +1406,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ManualSnapshotStorage.shared.save(manualSnapshots)
         
         debugPrint("📸 \(reason)スナップショット完了: \(savedCount)個のウィンドウ")
+        
+        // 通知（自動スナップショットはサウンドのみ、システム通知は送らない）
+        if SnapshotSettings.shared.enableSound {
+            NSSound(named: NSSound.Name(SnapshotSettings.shared.soundName))?.play()
+        }
+        
+        // メニューを更新
+        DispatchQueue.main.async { [weak self] in
+            self?.setupMenu()
+        }
     }
     
     /// 外部ディスプレイ認識安定後のスナップショットタイマーを開始
