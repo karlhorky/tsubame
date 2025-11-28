@@ -1194,6 +1194,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                                 debugPrint("    ❌ \(appName) の移動失敗: \(setResult.rawValue)")
                                             }
                                         }
+                                        matchFound = true
                                         break
                                     }
                                 }
