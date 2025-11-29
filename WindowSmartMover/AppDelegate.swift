@@ -1580,7 +1580,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Timer を .common モードで RunLoop に追加(UI操作中も動作)
         let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
             debugPrint("⏱️ Initial auto-snapshot timer fired")
-            self?.performAutoSnapshot(reason: "初回自動")
+            self?.performAutoSnapshot(reason: "Initial auto")
             self?.hasInitialSnapshotBeenTaken = true
             
             // 定期スナップショットが有効なら開始
@@ -1613,7 +1613,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Timer を .common モードで RunLoop に追加(UI操作中も動作)
         let timer = Timer(timeInterval: intervalSeconds, repeats: true) { [weak self] _ in
             debugPrint("⏱️ Periodic snapshot timer fired")
-            self?.performAutoSnapshot(reason: "定期自動")
+            self?.performAutoSnapshot(reason: "Periodic auto")
         }
         RunLoop.main.add(timer, forMode: .common)
         periodicSnapshotTimer = timer
@@ -1743,7 +1743,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Timer を .common モードで RunLoop に追加(UI操作中も動作)
         let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
             debugPrint("⏱️ Post-display-connection snapshot timer fired")
-            self?.performAutoSnapshot(reason: "ディスプレイ認識後自動")
+            self?.performAutoSnapshot(reason: "Post-display auto")
             self?.hasInitialSnapshotBeenTaken = true
             
             // 定期スナップショットが有効で、まだ開始していなければ開始
