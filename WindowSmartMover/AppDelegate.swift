@@ -53,6 +53,10 @@ class DebugLogger {
     private var logs: [String] = []
     private let maxLogs = 1000
     
+    // アプリ名マスク用のマッピング
+    private var appNameMapping: [String: String] = [:]
+    private var appCounter = 0
+    
     func addLog(_ message: String) {
         let timestamp: String
         if SnapshotSettings.shared.showMilliseconds {
@@ -77,6 +81,26 @@ class DebugLogger {
     
     func clearLogs() {
         logs.removeAll()
+    }
+    
+    /// アプリ名をマスクする（設定に応じて）
+    func maskAppName(_ name: String) -> String {
+        guard SnapshotSettings.shared.maskAppNamesInLog else {
+            return name  // マスクOFFなら元の名前
+        }
+        if let masked = appNameMapping[name] {
+            return masked
+        }
+        appCounter += 1
+        let masked = "App\(appCounter)"
+        appNameMapping[name] = masked
+        return masked
+    }
+    
+    /// アプリ名マッピングをクリア
+    func clearAppNameMapping() {
+        appNameMapping.removeAll()
+        appCounter = 0
     }
 }
 
@@ -191,6 +215,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // SnapshotSettingsを初期化
         _ = SnapshotSettings.shared
+        
+        // 起動時情報をログに出力
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
+        debugPrint("========== Tsubame v\(version) (build \(build)) ==========")
+        debugPrint("Settings:")
+        debugPrint("  Hotkey: \(HotKeySettings.shared.getModifierString())")
+        debugPrint("  Display stabilization: \(String(format: "%.1f", WindowTimingSettings.shared.displayStabilizationDelay))s")
+        debugPrint("  Window restore delay: \(String(format: "%.1f", WindowTimingSettings.shared.windowRestoreDelay))s")
+        debugPrint("  Restore on launch: \(SnapshotSettings.shared.restoreOnLaunch ? "ON" : "OFF")")
+        debugPrint("  Verbose logging: \(SnapshotSettings.shared.verboseLogging ? "ON" : "OFF")")
+        debugPrint("  Mask app names: \(SnapshotSettings.shared.maskAppNamesInLog ? "ON" : "OFF")")
+        debugPrint("================================================")
         
         // 保存済みスナップショットを読み込み
         loadSavedSnapshots()
@@ -604,7 +641,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        debugPrint("フロントアプリ: \(appName)")
+        debugPrint("フロントアプリ: \(DebugLogger.shared.maskAppName(appName))")
         
         // Accessibility APIでウィンドウを取得
         let appRef = AXUIElementCreateApplication(frontApp.processIdentifier)
@@ -1026,7 +1063,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     // タイトル情報を含めてログ出力（詳細モード）
                     let titleInfo = windowTitle != nil ? "title:✓" : "title:✗"
                     let sizeInfo = "\(Int(frame.width))x\(Int(frame.height))"
-                    verbosePrint("  保存: \(ownerName) @ (\(Int(frame.origin.x)), \(Int(frame.origin.y))) [\(sizeInfo)] [\(titleInfo)]")
+                    verbosePrint("  保存: \(DebugLogger.shared.maskAppName(ownerName)) @ (\(Int(frame.origin.x)), \(Int(frame.origin.y))) [\(sizeInfo)] [\(titleInfo)]")
                     break
                 }
             }
@@ -1137,9 +1174,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                         if posResult == .success {
                                             restoredCount += 1
                                             let sizeInfo = sizeRestored ? "+サイズ" : ""
-                                            debugPrint("    ✅ \(ownerName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
+                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
                                         } else {
-                                            debugPrint("    ❌ \(ownerName) の移動失敗: \(posResult.rawValue)")
+                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) の移動失敗: \(posResult.rawValue)")
                                         }
                                     }
                                     break
@@ -1323,7 +1360,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let ownerName = window[kCGWindowOwnerName as String] as? String,
                let cgWindowID = window[kCGWindowNumber as String] as? CGWindowID,
                let layer = window[kCGWindowLayer as String] as? Int, layer == 0 {
-                verbosePrint("    現在: \(ownerName) (ID:\(cgWindowID))")
+                verbosePrint("    現在: \(DebugLogger.shared.maskAppName(ownerName)) (ID:\(cgWindowID))")
             }
         }
         
@@ -1423,9 +1460,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                         if posResult == .success {
                                             restoredCount += 1
                                             let sizeInfo = sizeRestored ? "+サイズ" : ""
-                                            debugPrint("    ✅ \(ownerName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
+                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
                                         } else {
-                                            debugPrint("    ❌ \(ownerName) の移動失敗: \(posResult.rawValue)")
+                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) の移動失敗: \(posResult.rawValue)")
                                         }
                                     }
                                     matchFound = true

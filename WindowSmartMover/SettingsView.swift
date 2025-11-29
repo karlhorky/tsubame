@@ -294,6 +294,7 @@ class SnapshotSettings: ObservableObject {
     private let verboseLoggingKey = "snapshotVerboseLogging"
     private let restoreOnLaunchKey = "snapshotRestoreOnLaunch"
     private let showMillisecondsKey = "debugShowMilliseconds"
+    private let maskAppNamesKey = "debugMaskAppNames"
     
     /// 利用可能なシステムサウンド
     static let availableSounds = [
@@ -355,6 +356,15 @@ class SnapshotSettings: ObservableObject {
         }
     }
     
+    /// ログのアプリ名をマスク（プライバシー保護）
+    @Published var maskAppNamesInLog: Bool {
+        didSet {
+            defaults.set(maskAppNamesInLog, forKey: maskAppNamesKey)
+            // 設定変更時にマッピングをクリア
+            DebugLogger.shared.clearAppNameMapping()
+        }
+    }
+    
     private init() {
         self.initialSnapshotDelay = defaults.object(forKey: initialDelayKey) as? Double ?? 15.0
         self.enablePeriodicSnapshot = defaults.object(forKey: enablePeriodicKey) as? Bool ?? false
@@ -368,6 +378,7 @@ class SnapshotSettings: ObservableObject {
         self.verboseLogging = defaults.object(forKey: verboseLoggingKey) as? Bool ?? false
         self.restoreOnLaunch = defaults.object(forKey: restoreOnLaunchKey) as? Bool ?? false
         self.showMilliseconds = defaults.object(forKey: showMillisecondsKey) as? Bool ?? false
+        self.maskAppNamesInLog = defaults.object(forKey: maskAppNamesKey) as? Bool ?? true
     }
     
     /// サウンドをプレビュー再生
@@ -721,6 +732,8 @@ struct SettingsView: View {
                     Toggle("詳細ログを出力", isOn: $snapshotSettings.verboseLogging)
 
                     Toggle("ミリ秒を表示", isOn: $snapshotSettings.showMilliseconds)
+                    
+                    Toggle("アプリ名をマスク", isOn: $snapshotSettings.maskAppNamesInLog)
 
                     Text("スナップショット保存・復元時の詳細情報をログに出力します")
                         .font(.caption)
@@ -885,6 +898,7 @@ struct SettingsView: View {
         snapshotSettings.enableNotification = false
         snapshotSettings.restoreOnLaunch = false
         snapshotSettings.showMilliseconds = false
+        snapshotSettings.maskAppNamesInLog = true
     }
     
     private func formatMinutes(_ minutes: Double) -> String {
