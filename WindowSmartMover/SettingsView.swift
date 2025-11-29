@@ -6,21 +6,73 @@ import CryptoKit
 
 // MARK: - Window Matching Data Structure
 
-/// ウィンドウ識別情報（プライバシー保護のためハッシュ化）
+// MARK: - Language Settings
+enum AppLanguage: String, CaseIterable {
+    case system = "system"
+    case english = "en"
+    case japanese = "ja"
+    
+    var displayName: String {
+        switch self {
+        case .system: return NSLocalizedString("System Default", comment: "Language option")
+        case .english: return "English"
+        case .japanese: return "日本語"
+        }
+    }
+}
+
+class LanguageSettings: ObservableObject {
+    static let shared = LanguageSettings()
+    
+    private let languageKey = "AppLanguage"
+    
+    @Published var selectedLanguage: AppLanguage {
+        didSet {
+            applyLanguage(selectedLanguage)
+        }
+    }
+    
+    private init() {
+        // Load saved setting
+        if let saved = UserDefaults.standard.string(forKey: languageKey),
+           let language = AppLanguage(rawValue: saved) {
+            self.selectedLanguage = language
+        } else {
+            self.selectedLanguage = .system
+        }
+    }
+    
+    private func applyLanguage(_ language: AppLanguage) {
+        UserDefaults.standard.set(language.rawValue, forKey: languageKey)
+        
+        switch language {
+        case .system:
+            // Remove override, use system language
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        case .english, .japanese:
+            // Set specific language
+            UserDefaults.standard.set([language.rawValue], forKey: "AppleLanguages")
+        }
+        
+        UserDefaults.standard.synchronize()
+    }
+}
+
+/// Window identification info (hashed for privacy protection)
 struct WindowMatchInfo: Codable, Equatable {
     let appNameHash: String      // SHA256(appName)
-    let titleHash: String?       // SHA256(title) - マッチング用
-    let size: CGSize             // フォールバックマッチング用
-    let frame: CGRect            // 復元位置
+    let titleHash: String?       // SHA256(title) - for matching
+    let size: CGSize             // for fallback matching
+    let frame: CGRect            // restore position
     
-    /// SHA256ハッシュを生成
+    /// Generate SHA256 hash
     static func hash(_ input: String) -> String {
         let data = Data(input.utf8)
         let hash = SHA256.hash(data: data)
         return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
     
-    /// ウィンドウ情報から生成
+    /// Create from window info
     init(appName: String, title: String?, size: CGSize, frame: CGRect) {
         self.appNameHash = WindowMatchInfo.hash(appName)
         self.titleHash = title.map { WindowMatchInfo.hash($0) }
@@ -28,7 +80,7 @@ struct WindowMatchInfo: Codable, Equatable {
         self.frame = frame
     }
     
-    /// サイズが近似しているか（±20px許容）
+    /// Check if size is approximately equal (±20px tolerance)
     func sizeMatches(_ otherSize: CGSize, tolerance: CGFloat = 20) -> Bool {
         return abs(size.width - otherSize.width) <= tolerance &&
                abs(size.height - otherSize.height) <= tolerance
@@ -51,18 +103,18 @@ class HotKeySettings: ObservableObject {
         didSet { UserDefaults.standard.set(useCommand, forKey: "useCommand") }
     }
     
-    /// ウィンドウ微調整のピクセル数（10-500、デフォルト100）
+    /// Window nudge pixels (10-500, default 100)
     @Published var nudgePixels: Int {
         didSet { UserDefaults.standard.set(nudgePixels, forKey: "nudgePixels") }
     }
     
     private init() {
-        // デフォルト値: Ctrl + Command
+        // Default: Option + Command
         self.useControl = UserDefaults.standard.object(forKey: "useControl") as? Bool ?? false
         self.useOption = UserDefaults.standard.object(forKey: "useOption") as? Bool ?? true
         self.useShift = UserDefaults.standard.object(forKey: "useShift") as? Bool ?? false
         self.useCommand = UserDefaults.standard.object(forKey: "useCommand") as? Bool ?? true
-        // デフォルト値: 100ピクセル
+        // Default: 100 pixels
         self.nudgePixels = UserDefaults.standard.object(forKey: "nudgePixels") as? Int ?? 100
     }
     
@@ -85,7 +137,7 @@ class HotKeySettings: ObservableObject {
     }
 }
 
-// WindowTimingSettings: ウィンドウ読み込みタイミング設定
+// WindowTimingSettings: Window loading timing settings
 class WindowTimingSettings: ObservableObject {
     static let shared = WindowTimingSettings()
     
@@ -113,11 +165,11 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
-    /// ディスプレイ記憶用の監視間隔（秒）: 1-30秒、デフォルト5秒
+    /// Display memory monitoring interval (seconds): 1-30s, default 5s
     @Published var displayMemoryInterval: Double {
         didSet {
             defaults.set(displayMemoryInterval, forKey: displayMemoryIntervalKey)
-            // 設定変更を通知
+            // Notify settings change
             NotificationCenter.default.post(
                 name: Notification.Name("DisplayMemoryIntervalChanged"),
                 object: nil
@@ -125,7 +177,7 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
-    // スリープ監視関連
+    // Sleep monitoring related
     @Published var lastSleepTime: Date?
     @Published var lastWakeTime: Date?
     @Published var sleepDurationHours: Double = 0
@@ -135,20 +187,20 @@ class WindowTimingSettings: ObservableObject {
     private var wakeObserver: NSObjectProtocol?
     
     private init() {
-        // デフォルト値: ディスプレイ接続後の待機時間は6.0秒
+        // Default: Post-display-connection wait time is 6.0s
         self.windowRestoreDelay = defaults.object(forKey: windowDelayKey) as? Double ?? 6.0
-        // デフォルト値: ディスプレイ変更の落ち着き待ち時間は6.0秒
+        // Default: Display change stabilization wait time is 6.0s
         self.displayStabilizationDelay = defaults.object(forKey: displayStabilizationKey) as? Double ?? 6.0
-        // デフォルト値: スリープ中の監視停止を有効化
+        // Default: Enable monitoring pause during sleep
         self.disableMonitoringDuringSleep = defaults.object(forKey: disableMonitoringKey) as? Bool ?? true
-        // デフォルト値: ディスプレイ記憶用監視間隔は5.0秒
+        // Default: Display memory monitoring interval is 5.0s
         self.displayMemoryInterval = defaults.object(forKey: displayMemoryIntervalKey) as? Double ?? 5.0
         
-        // スリープ監視を開始
+        // Start sleep monitoring
         startSleepMonitoring()
     }
     
-    // スリープ監視開始
+    // Start sleep monitoring
     private func startSleepMonitoring() {
         sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification,
@@ -159,7 +211,7 @@ class WindowTimingSettings: ObservableObject {
             self.lastSleepTime = Date()
             print("💤 System going to sleep at \(Date())")
             
-            // スリープ時にディスプレイ監視を一時停止
+            // Pause display monitoring during sleep
             if self.disableMonitoringDuringSleep {
                 self.isMonitoringEnabled = false
                 print("⏸️ Display monitoring disabled during sleep")
@@ -179,7 +231,7 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
-    // ウェイク時の処理
+    // Wake handling
     private func handleWake() {
         lastWakeTime = Date()
         if let sleepTime = lastSleepTime {
@@ -188,35 +240,35 @@ class WindowTimingSettings: ObservableObject {
             print("☀️ System woke from sleep after \(String(format: "%.2f", sleepDurationHours)) hours")
         }
         
-        // 監視一時停止機能が有効な場合
+        // If monitoring pause feature is enabled
         if disableMonitoringDuringSleep {
-            print("⏱️ ディスプレイ変更の安定化を待機中...")
-            print("   安定化検出により自動的に監視が再開されます")
-            // 注: 監視再開は安定化ロジック（AppDelegate）が自動的に行う
-            // ここでは何もしない = ディスプレイ変更イベントの安定化に任せる
+            print("⏱️ Waiting for display stabilization...")
+            print("   Monitoring will resume automatically after stabilization")
+            // Note: Monitoring resume is handled automatically by stabilization logic (AppDelegate)
+            // Do nothing here = leave it to display change event stabilization
         }
     }
     
-    // 動的調整された待機時間を取得
+    // Get dynamically adjusted wait time
     func getAdjustedDisplayDelay() -> Double {
         let baseDelay = displayStabilizationDelay
         
-        // スリープ時間に応じて追加の待機時間を決定
+        // Determine additional wait time based on sleep duration
         switch sleepDurationHours {
         case 0..<0.5:
-            // 30分未満: 変更なし
+            // Less than 30 min: no change
             return baseDelay
         case 0.5..<1.0:
-            // 30分〜1時間: +2秒
+            // 30 min - 1 hour: +2s
             return baseDelay + 2.0
         case 1.0..<2.0:
-            // 1〜2時間: +5秒
+            // 1-2 hours: +5s
             return baseDelay + 5.0
         case 2.0..<4.0:
-            // 2〜4時間: +10秒
+            // 2-4 hours: +10s
             return baseDelay + 10.0
         default:
-            // 4時間以上: +15秒
+            // 4+ hours: +15s
             return baseDelay + 15.0
         }
     }
@@ -231,7 +283,7 @@ class WindowTimingSettings: ObservableObject {
     }
 }
 
-// SnapshotSettings: 自動スナップショット設定
+// SnapshotSettings: Auto snapshot settings
 class SnapshotSettings: ObservableObject {
     static let shared = SnapshotSettings()
     
@@ -240,18 +292,18 @@ class SnapshotSettings: ObservableObject {
     private let enablePeriodicKey = "snapshotEnablePeriodic"
     private let periodicIntervalKey = "snapshotPeriodicInterval"
     
-    /// 初回スナップショット遅延（分）: 0.5-60分、デフォルト5分
+    /// Initial snapshot delay (minutes): 0.5-60min, default 5min
     @Published var initialSnapshotDelay: Double {
         didSet {
             defaults.set(initialSnapshotDelay, forKey: initialDelayKey)
         }
     }
     
-    /// 定期スナップショット有効化
+    /// Enable periodic snapshot
     @Published var enablePeriodicSnapshot: Bool {
         didSet {
             defaults.set(enablePeriodicSnapshot, forKey: enablePeriodicKey)
-            // 設定変更を通知
+            // Notify settings change
             NotificationCenter.default.post(
                 name: Notification.Name("SnapshotSettingsChanged"),
                 object: nil
@@ -259,11 +311,11 @@ class SnapshotSettings: ObservableObject {
         }
     }
     
-    /// 定期スナップショット間隔（分）: 5-360分、デフォルト30分
+    /// Periodic snapshot interval (minutes): 5-360min, default 30min
     @Published var periodicSnapshotInterval: Double {
         didSet {
             defaults.set(periodicSnapshotInterval, forKey: periodicIntervalKey)
-            // 設定変更を通知
+            // Notify settings change
             NotificationCenter.default.post(
                 name: Notification.Name("SnapshotSettingsChanged"),
                 object: nil
@@ -271,14 +323,14 @@ class SnapshotSettings: ObservableObject {
         }
     }
     
-    /// 既存スナップショット保護（ウィンドウ数が少ない場合は上書きしない）
+    /// Protect existing snapshot (don't overwrite if window count is low)
     @Published var protectExistingSnapshot: Bool {
         didSet {
             defaults.set(protectExistingSnapshot, forKey: protectExistingKey)
         }
     }
     
-    /// 保護時の最小ウィンドウ数
+    /// Minimum window count for protection
     @Published var minimumWindowCount: Int {
         didSet {
             defaults.set(minimumWindowCount, forKey: minimumWindowCountKey)
@@ -296,71 +348,71 @@ class SnapshotSettings: ObservableObject {
     private let showMillisecondsKey = "debugShowMilliseconds"
     private let maskAppNamesKey = "debugMaskAppNames"
     
-    /// 利用可能なシステムサウンド
+    /// Available system sounds
     static let availableSounds = [
         "Blow", "Bottle", "Frog", "Funk", "Glass",
         "Hero", "Morse", "Ping", "Pop", "Purr",
         "Sosumi", "Submarine", "Tink"
     ]
     
-    /// サウンド通知有効化
+    /// Enable sound notification
     @Published var enableSound: Bool {
         didSet {
             defaults.set(enableSound, forKey: enableSoundKey)
         }
     }
     
-    /// 通知サウンド名
+    /// Notification sound name
     @Published var soundName: String {
         didSet {
             defaults.set(soundName, forKey: soundNameKey)
         }
     }
     
-    /// システム通知有効化
+    /// Enable system notification
     @Published var enableNotification: Bool {
         didSet {
             defaults.set(enableNotification, forKey: enableNotificationKey)
         }
     }
     
-    /// アプリ起動時に自動復元
+    /// Auto-restore on app launch
     @Published var restoreOnLaunch: Bool {
         didSet {
             defaults.set(restoreOnLaunch, forKey: restoreOnLaunchKey)
         }
     }
     
-    /// スナップショットを永続化しない（プライバシー保護モード）
+    /// Don't persist snapshots (privacy protection mode)
     @Published var disablePersistence: Bool {
         didSet {
             defaults.set(disablePersistence, forKey: disablePersistenceKey)
-            // 有効化時に既存データをクリア
+            // Clear existing data when enabled
             if disablePersistence {
                 ManualSnapshotStorage.shared.clear()
             }
         }
     }
     
-    /// 詳細ログを出力（デバッグ用）
+    /// Output verbose logs (for debugging)
     @Published var verboseLogging: Bool {
         didSet {
             defaults.set(verboseLogging, forKey: verboseLoggingKey)
         }
     }
     
-    /// ログにミリ秒を表示
+    /// Show milliseconds in logs
     @Published var showMilliseconds: Bool {
         didSet {
             defaults.set(showMilliseconds, forKey: showMillisecondsKey)
         }
     }
     
-    /// ログのアプリ名をマスク（プライバシー保護）
+    /// Mask app names in logs (privacy protection)
     @Published var maskAppNamesInLog: Bool {
         didSet {
             defaults.set(maskAppNamesInLog, forKey: maskAppNamesKey)
-            // 設定変更時にマッピングをクリア
+            // Clear mapping when setting changes
             DebugLogger.shared.clearAppNameMapping()
         }
     }
@@ -381,56 +433,56 @@ class SnapshotSettings: ObservableObject {
         self.maskAppNamesInLog = defaults.object(forKey: maskAppNamesKey) as? Bool ?? true
     }
     
-    /// サウンドをプレビュー再生
+    /// Preview sound playback
     func previewSound() {
         NSSound(named: NSSound.Name(soundName))?.play()
     }
     
-    /// 初回遅延を秒単位で取得
+    /// Get initial delay in seconds
     var initialDelaySeconds: Double {
         return initialSnapshotDelay * 60.0
     }
     
-    /// 定期間隔を秒単位で取得
+    /// Get periodic interval in seconds
     var periodicIntervalSeconds: Double {
         return periodicSnapshotInterval * 60.0
     }
 }
 
-// ManualSnapshotStorage: スナップショットの永続化（プライバシー保護版）
+// ManualSnapshotStorage: Snapshot persistence (privacy-protected version)
 class ManualSnapshotStorage {
     static let shared = ManualSnapshotStorage()
     
     private let defaults = UserDefaults.standard
-    private let storageKey = "manualSnapshotDataV2"  // 新形式用のキー
+    private let storageKey = "manualSnapshotDataV2"  // Key for new format
     private let timestampKey = "manualSnapshotTimestamp"
-    private let legacyStorageKey = "manualSnapshotData"  // 旧形式のキー（マイグレーション用）
+    private let legacyStorageKey = "manualSnapshotData"  // Key for old format (for migration)
     
     private init() {
-        // 旧形式データがあれば削除
+        // Remove legacy format data if exists
         if defaults.data(forKey: legacyStorageKey) != nil {
             defaults.removeObject(forKey: legacyStorageKey)
-            print("🔄 旧形式のスナップショットデータを削除しました（v1.3.0移行）")
+            print("🔄 Removed legacy snapshot data (v1.3.0 migration)")
         }
     }
     
-    /// スナップショットを保存（新形式: WindowMatchInfo）
+    /// Save snapshot (new format: WindowMatchInfo)
     func save(_ snapshots: [[String: [String: WindowMatchInfo]]]) {
-        // 永続化無効の場合はスキップ
+        // Skip if persistence is disabled
         if SnapshotSettings.shared.disablePersistence {
-            print("🔒 永続化無効モード: スナップショットは保存されません")
+            print("🔒 Persistence disabled: Snapshot not saved")
             return
         }
         
-        // WindowMatchInfoは直接Codable対応
+        // WindowMatchInfo is directly Codable compatible
         if let data = try? JSONEncoder().encode(snapshots) {
             defaults.set(data, forKey: storageKey)
             defaults.set(Date().timeIntervalSince1970, forKey: timestampKey)
-            print("💾 スナップショットを永続化しました（プライバシー保護形式）")
+            print("💾 Snapshot persisted (privacy-protected format)")
         }
     }
     
-    /// スナップショットを読み込み（新形式）
+    /// Load snapshot (new format)
     func load() -> [[String: [String: WindowMatchInfo]]]? {
         guard let data = defaults.data(forKey: storageKey),
               let snapshots = try? JSONDecoder().decode([[String: [String: WindowMatchInfo]]].self, from: data) else {
@@ -439,13 +491,13 @@ class ManualSnapshotStorage {
         
         if let timestamp = defaults.object(forKey: timestampKey) as? Double {
             let date = Date(timeIntervalSince1970: timestamp)
-            print("💾 保存済みスナップショットを読み込みました（保存日時: \(date)）")
+            print("💾 Loaded saved snapshot (saved at: \(date))")
         }
         
         return snapshots
     }
     
-    /// 保存日時を取得
+    /// Get save timestamp
     func getTimestamp() -> Date? {
         guard let timestamp = defaults.object(forKey: timestampKey) as? Double else {
             return nil
@@ -453,14 +505,14 @@ class ManualSnapshotStorage {
         return Date(timeIntervalSince1970: timestamp)
     }
     
-    /// スナップショットをクリア
+    /// Clear snapshot
     func clear() {
         defaults.removeObject(forKey: storageKey)
         defaults.removeObject(forKey: timestampKey)
-        print("🗑️ 永続化されたスナップショットをクリアしました")
+        print("🗑️ Persisted snapshot cleared")
     }
     
-    /// スナップショットが存在するか
+    /// Check if snapshot exists
     var hasSnapshot: Bool {
         return defaults.data(forKey: storageKey) != nil
     }
@@ -470,16 +522,18 @@ struct SettingsView: View {
     @ObservedObject var settings = HotKeySettings.shared
     @ObservedObject var timingSettings = WindowTimingSettings.shared
     @ObservedObject var snapshotSettings = SnapshotSettings.shared
+    @ObservedObject var languageSettings = LanguageSettings.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedTab = 0
+    @State private var showRestartAlert = false
     
     var body: some View {
         VStack(spacing: 16) {
-            Text("設定")
+            Text(NSLocalizedString("Settings", comment: "Settings window title"))
                 .font(.title)
                 .padding(.top)
             
-            // タブ選択
+            // Tab selection
             Picker("", selection: $selectedTab) {
                 Text("Basic").tag(0)
                 Text("Advanced").tag(1)
@@ -487,7 +541,7 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal)
             
-            // タブコンテンツ
+            // Tab content
             ScrollView {
                 if selectedTab == 0 {
                     basicSettingsContent
@@ -498,21 +552,21 @@ struct SettingsView: View {
             
             Divider()
             
-            // フッター
+            // Footer
             HStack {
-                Button("デフォルトに戻す") {
+                Button(NSLocalizedString("Reset to Defaults", comment: "Button to reset settings")) {
                     resetToDefaults()
                 }
                 
                 Spacer()
                 
-                Text("⚠️ 一部の設定は再起動が必要")
+                Text(NSLocalizedString("⚠️ Some settings require restart", comment: "Restart warning"))
                     .font(.caption)
                     .foregroundColor(.orange)
                 
                 Spacer()
                 
-                Button("閉じる") {
+                Button(NSLocalizedString("Close", comment: "Button to close window")) {
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -522,16 +576,43 @@ struct SettingsView: View {
         }
         .padding()
         .frame(width: 520, height: 620)
+        .alert(NSLocalizedString("Restart Required", comment: "Alert title"), isPresented: $showRestartAlert) {
+            Button(NSLocalizedString("Restart Now", comment: "Alert button")) {
+                restartApp()
+            }
+            Button(NSLocalizedString("Later", comment: "Alert button"), role: .cancel) {}
+        } message: {
+            Text(NSLocalizedString("Please restart the app to apply the language change.", comment: "Alert message"))
+        }
     }
     
     // MARK: - Basic Settings Tab
     
     private var basicSettingsContent: some View {
         VStack(spacing: 16) {
-            // ショートカットキー設定
-            GroupBox(label: Text("ショートカットキー").font(.headline)) {
+            // Language
+            GroupBox(label: Text(NSLocalizedString("Language", comment: "")).font(.headline)) {
+                HStack {
+                    Picker(NSLocalizedString("Display Language:", comment: ""), selection: $languageSettings.selectedLanguage) {
+                        ForEach(AppLanguage.allCases, id: \.self) { language in
+                            Text(language.displayName).tag(language)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .onChange(of: languageSettings.selectedLanguage) { oldValue, newValue in
+                        showRestartAlert = true
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+            }
+            .padding(.horizontal)
+            
+            // Shortcut keys
+            GroupBox(label: Text(NSLocalizedString("Shortcut Keys", comment: "")).font(.headline)) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("修飾キーを選択：")
+                    Text(NSLocalizedString("Select modifier keys:", comment: ""))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
@@ -546,10 +627,10 @@ struct SettingsView: View {
                     
                     Divider()
                     
-                    // 現在のショートカット
+                    // Current shortcuts
                     HStack(spacing: 30) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("画面間移動：")
+                            Text(NSLocalizedString("Move between screens:", comment: ""))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             HStack {
@@ -559,7 +640,7 @@ struct SettingsView: View {
                             }
                         }
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("スナップショット：")
+                            Text(NSLocalizedString("Snapshot:", comment: ""))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             HStack {
@@ -573,8 +654,8 @@ struct SettingsView: View {
                 .padding(.vertical, 8)
             }
             
-            // ウィンドウ位置微調整
-            GroupBox(label: Text("ウィンドウ位置微調整").font(.headline)) {
+            // Window position adjustment
+            GroupBox(label: Text(NSLocalizedString("Window Position Adjustment", comment: "")).font(.headline)) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 16) {
                         VStack(spacing: 2) {
@@ -605,7 +686,7 @@ struct SettingsView: View {
                         Spacer()
                         
                         HStack {
-                            Text("移動量:")
+                            Text(NSLocalizedString("Move amount:", comment: ""))
                                 .font(.subheadline)
                             Stepper(value: $settings.nudgePixels, in: 10...500, step: 10) {
                                 Text("\(settings.nudgePixels) px")
@@ -619,19 +700,19 @@ struct SettingsView: View {
                 .padding(.vertical, 8)
             }
             
-            // 自動スナップショット
-            GroupBox(label: Text("自動スナップショット").font(.headline)) {
+            // Auto Snapshot
+            GroupBox(label: Text(NSLocalizedString("Auto Snapshot", comment: "")).font(.headline)) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Toggle("アプリ起動時に自動復元", isOn: $snapshotSettings.restoreOnLaunch)
+                    Toggle(NSLocalizedString("Auto-restore on app launch", comment: ""), isOn: $snapshotSettings.restoreOnLaunch)
                     
-                    Text("起動時に保存済みスナップショットを復元します")
+                    Text(NSLocalizedString("Restores saved snapshot when the app starts", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
                     Divider()
                     
                     HStack {
-                        Text("初回取得までの時間:")
+                        Text(NSLocalizedString("Initial capture delay:", comment: ""))
                             .font(.subheadline)
                         Spacer()
                         Stepper(value: $snapshotSettings.initialSnapshotDelay, in: 0.5...60.0, step: 0.5) {
@@ -642,11 +723,11 @@ struct SettingsView: View {
                         }
                     }
                     
-                    Toggle("定期的に自動取得", isOn: $snapshotSettings.enablePeriodicSnapshot)
+                    Toggle(NSLocalizedString("Periodic auto-capture", comment: ""), isOn: $snapshotSettings.enablePeriodicSnapshot)
                     
                     if snapshotSettings.enablePeriodicSnapshot {
                         HStack {
-                            Text("取得間隔:")
+                            Text(NSLocalizedString("Capture interval:", comment: ""))
                                 .font(.subheadline)
                             Spacer()
                             Stepper(value: $snapshotSettings.periodicSnapshotInterval, in: 5.0...360.0, step: 5.0) {
@@ -660,11 +741,11 @@ struct SettingsView: View {
                     
                     Divider()
                     
-                    Toggle("既存データを保護", isOn: $snapshotSettings.protectExistingSnapshot)
+                    Toggle(NSLocalizedString("Protect existing data", comment: ""), isOn: $snapshotSettings.protectExistingSnapshot)
                     
                     if snapshotSettings.protectExistingSnapshot {
                         HStack {
-                            Text("最小ウィンドウ数:")
+                            Text(NSLocalizedString("Minimum windows:", comment: ""))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Stepper(value: $snapshotSettings.minimumWindowCount, in: 1...10) {
@@ -672,7 +753,7 @@ struct SettingsView: View {
                                     .foregroundColor(.blue)
                                     .frame(width: 25, alignment: .trailing)
                             }
-                            Text("個未満は上書きしない")
+                            Text(NSLocalizedString("(skip if fewer)", comment: ""))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -680,32 +761,32 @@ struct SettingsView: View {
                     
                     Divider()
                     
-                    // プライバシー設定
-                    Text("プライバシー")
+                    // Privacy settings
+                    Text(NSLocalizedString("Privacy", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    Toggle("スナップショットを永続化しない", isOn: $snapshotSettings.disablePersistence)
+                    Toggle(NSLocalizedString("Don't persist snapshots", comment: ""), isOn: $snapshotSettings.disablePersistence)
                     
-                    Text("有効にすると、アプリ終了時にすべてのデータが消去されます")
+                    Text(NSLocalizedString("When enabled, all data is cleared on app quit", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
                     Divider()
                     
-                    // 通知設定
-                    Text("通知")
+                    // Notification settings
+                    Text(NSLocalizedString("Notifications", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
                     HStack {
-                        Toggle("サウンド", isOn: $snapshotSettings.enableSound)
-                        Toggle("システム通知", isOn: $snapshotSettings.enableNotification)
+                        Toggle(NSLocalizedString("Sound", comment: ""), isOn: $snapshotSettings.enableSound)
+                        Toggle(NSLocalizedString("System notification", comment: ""), isOn: $snapshotSettings.enableNotification)
                     }
                     
                     if snapshotSettings.enableSound {
                         HStack {
-                            Text("サウンド:")
+                            Text(NSLocalizedString("Sound:", comment: ""))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Picker("", selection: $snapshotSettings.soundName) {
@@ -718,48 +799,48 @@ struct SettingsView: View {
                             Button("♪") {
                                 snapshotSettings.previewSound()
                             }
-                            .help("プレビュー再生")
+                            .help(NSLocalizedString("Preview sound", comment: ""))
                         }
                     }
                     
                     Divider()
                     
-                    // デバッグ設定
-                    Text("デバッグ")
+                    // Debug settings
+                    Text(NSLocalizedString("Debug", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    Toggle("詳細ログを出力", isOn: $snapshotSettings.verboseLogging)
+                    Toggle(NSLocalizedString("Verbose logging", comment: ""), isOn: $snapshotSettings.verboseLogging)
 
-                    Toggle("ミリ秒を表示", isOn: $snapshotSettings.showMilliseconds)
+                    Toggle(NSLocalizedString("Show milliseconds", comment: ""), isOn: $snapshotSettings.showMilliseconds)
                     
-                    Toggle("アプリ名をマスク", isOn: $snapshotSettings.maskAppNamesInLog)
+                    Toggle(NSLocalizedString("Mask app names", comment: ""), isOn: $snapshotSettings.maskAppNamesInLog)
 
-                    Text("スナップショット保存・復元時の詳細情報をログに出力します")
+                    Text(NSLocalizedString("Outputs detailed info during snapshot save/restore", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
 
                     Divider()
                     
-                    // 保存状態
+                    // Saved status
                     HStack {
                         if let timestamp = ManualSnapshotStorage.shared.getTimestamp() {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
-                            Text("最終保存: \(timestamp.formatted(date: .abbreviated, time: .shortened))")
+                            Text(String(format: NSLocalizedString("Last saved: %@", comment: ""), timestamp.formatted(date: .abbreviated, time: .shortened)))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         } else {
                             Image(systemName: "xmark.circle")
                                 .foregroundColor(.orange)
-                            Text("保存データなし")
+                            Text(NSLocalizedString("No saved data", comment: ""))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         
                         Spacer()
                         
-                        Button("クリア") {
+                        Button(NSLocalizedString("Clear", comment: "")) {
                             ManualSnapshotStorage.shared.clear()
                             NotificationCenter.default.post(
                                 name: Notification.Name("ClearManualSnapshot"),
@@ -780,20 +861,20 @@ struct SettingsView: View {
     
     private var advancedSettingsContent: some View {
         VStack(spacing: 16) {
-            // ウィンドウ復元タイミング
-            GroupBox(label: Text("ウィンドウ復元タイミング").font(.headline)) {
+            // Window restore timing
+            GroupBox(label: Text(NSLocalizedString("Window Restore Timing", comment: "")).font(.headline)) {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text("ディスプレイ変更検出の安定化時間:")
+                            Text(NSLocalizedString("Display change stabilization time:", comment: ""))
                                 .font(.subheadline)
                             Spacer()
-                            Text(String(format: "%.1f秒", timingSettings.displayStabilizationDelay))
+                            Text(String(format: NSLocalizedString("%.1fs", comment: "seconds"), timingSettings.displayStabilizationDelay))
                                 .foregroundColor(.blue)
                                 .fontWeight(.semibold)
                         }
                         Slider(value: $timingSettings.displayStabilizationDelay, in: 0.1...15.0, step: 0.1)
-                        Text("ディスプレイ変更イベントが落ち着くまでの待機時間")
+                        Text(NSLocalizedString("Wait time for display change events to settle", comment: ""))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -802,15 +883,15 @@ struct SettingsView: View {
                     
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text("ディスプレイ接続後の待機時間:")
+                            Text(NSLocalizedString("Post-connection delay:", comment: ""))
                                 .font(.subheadline)
                             Spacer()
-                            Text(String(format: "%.1f秒", timingSettings.windowRestoreDelay))
+                            Text(String(format: NSLocalizedString("%.1fs", comment: "seconds"), timingSettings.windowRestoreDelay))
                                 .foregroundColor(.blue)
                                 .fontWeight(.semibold)
                         }
                         Slider(value: $timingSettings.windowRestoreDelay, in: 0.1...15.0, step: 0.1)
-                        Text("macOSがウィンドウ座標を更新し終わるまでの待機時間")
+                        Text(NSLocalizedString("Wait for macOS to finish updating window coordinates", comment: ""))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -818,29 +899,29 @@ struct SettingsView: View {
                     Divider()
                     
                     HStack {
-                        Text("ウィンドウ位置の監視間隔:")
+                        Text(NSLocalizedString("Window position monitoring interval:", comment: ""))
                             .font(.subheadline)
                         Spacer()
                         Stepper(value: $timingSettings.displayMemoryInterval, in: 1.0...30.0, step: 1.0) {
-                            Text("\(Int(timingSettings.displayMemoryInterval))秒")
+                            Text(String(format: NSLocalizedString("%ds", comment: "seconds"), Int(timingSettings.displayMemoryInterval)))
                                 .foregroundColor(.blue)
                                 .fontWeight(.semibold)
                                 .frame(width: 45, alignment: .trailing)
                         }
                     }
-                    Text("ディスプレイ再接続時の自動復元用")
+                    Text(NSLocalizedString("For auto-restore on display reconnection", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 8)
             }
             
-            // スリープ時の動作設定
-            GroupBox(label: Text("スリープ時の動作").font(.headline)) {
+            // Sleep behavior
+            GroupBox(label: Text(NSLocalizedString("Sleep Behavior", comment: "")).font(.headline)) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Toggle("スリープ中はディスプレイ監視を一時停止", isOn: $timingSettings.disableMonitoringDuringSleep)
+                    Toggle(NSLocalizedString("Pause display monitoring during sleep", comment: ""), isOn: $timingSettings.disableMonitoringDuringSleep)
                     
-                    Text("スリープ中のディスプレイ変更イベントを無視します")
+                    Text(NSLocalizedString("Ignores display change events during sleep", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
@@ -848,23 +929,23 @@ struct SettingsView: View {
                         Divider()
                         
                         HStack {
-                            Text("前回のスリープ:")
+                            Text(NSLocalizedString("Last sleep:", comment: ""))
                                 .font(.caption)
-                            Text(String(format: "%.1f時間", timingSettings.sleepDurationHours))
+                            Text(String(format: NSLocalizedString("%.1f hours", comment: ""), timingSettings.sleepDurationHours))
                                 .font(.caption)
                                 .foregroundColor(.blue)
                             Spacer()
-                            Text("調整後の待機:")
+                            Text(NSLocalizedString("Adjusted delay:", comment: ""))
                                 .font(.caption)
-                            Text(String(format: "%.1f秒", timingSettings.getAdjustedDisplayDelay()))
+                            Text(String(format: NSLocalizedString("%.1fs", comment: "seconds"), timingSettings.getAdjustedDisplayDelay()))
                                 .font(.caption)
                                 .foregroundColor(.green)
                         }
                         
                         HStack {
-                            Text("監視状態:")
+                            Text(NSLocalizedString("Monitoring status:", comment: ""))
                                 .font(.caption)
-                            Text(timingSettings.isMonitoringEnabled ? "有効" : "一時停止中")
+                            Text(timingSettings.isMonitoringEnabled ? NSLocalizedString("Active", comment: "") : NSLocalizedString("Paused", comment: ""))
                                 .font(.caption)
                                 .foregroundColor(timingSettings.isMonitoringEnabled ? .green : .orange)
                         }
@@ -877,6 +958,17 @@ struct SettingsView: View {
     }
     
     // MARK: - Helper Functions
+    
+    private func restartApp() {
+        let url = URL(fileURLWithPath: Bundle.main.resourcePath!)
+        let path = url.deletingLastPathComponent().deletingLastPathComponent().absoluteString
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = [path]
+        task.launch()
+        
+        NSApplication.shared.terminate(nil)
+    }
     
     private func resetToDefaults() {
         settings.useControl = true
@@ -906,15 +998,15 @@ struct SettingsView: View {
             let hours = Int(minutes) / 60
             let mins = Int(minutes) % 60
             if mins == 0 {
-                return "\(hours)時間"
+                return String(format: NSLocalizedString("%dh", comment: "hours"), hours)
             } else {
-                return "\(hours)時間\(mins)分"
+                return String(format: NSLocalizedString("%dh %dm", comment: "hours and minutes"), hours, mins)
             }
         } else {
             if minutes == Double(Int(minutes)) {
-                return "\(Int(minutes))分"
+                return String(format: NSLocalizedString("%dm", comment: "minutes"), Int(minutes))
             } else {
-                return String(format: "%.1f分", minutes)
+                return String(format: NSLocalizedString("%.1fm", comment: "minutes with decimal"), minutes)
             }
         }
     }
