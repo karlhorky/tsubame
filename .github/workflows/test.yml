@@ -1,0 +1,30 @@
+name: Test
+
+# いつ実行するか
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: macos-latest
+
+    steps:
+      # 1. コードをチェックアウト
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Xcodeのバージョンを確認（デバッグ用）
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      # 3. テストを実行
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -project WindowSmartMover.xcodeproj \
+            -scheme WindowSmartMover \
+            -destination 'platform=macOS'
