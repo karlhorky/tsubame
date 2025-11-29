@@ -54,10 +54,16 @@ class DebugLogger {
     private let maxLogs = 1000
     
     func addLog(_ message: String) {
-        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        let timestamp: String
+        if SnapshotSettings.shared.showMilliseconds {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss.SSS"
+            timestamp = formatter.string(from: Date())
+        } else {
+            timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        }
         let logEntry = "[\(timestamp)] \(message)"
-        logs.append(logEntry)
-        
+    
         // ログが多すぎる場合は古いものを削除
         if logs.count > maxLogs {
             logs.removeFirst(logs.count - maxLogs)
@@ -222,6 +228,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // 初回自動スナップショットタイマーを開始
         startInitialSnapshotTimer()
+        
+        // 起動時自動復元（設定が有効 かつ スナップショットが存在する場合）
+        if SnapshotSettings.shared.restoreOnLaunch && ManualSnapshotStorage.shared.hasSnapshot {
+            let delay = WindowTimingSettings.shared.windowRestoreDelay
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                if NSScreen.screens.count >= 2 {
+                    debugPrint("🚀 起動時自動復元を実行")
+                    self?.restoreManualSnapshot()
+                } else {
+                    debugPrint("🚀 起動時自動復元: 外部ディスプレイ未接続のためスキップ")
+                }
+            }
+        }
         
         debugPrint("アプリが起動しました")
         debugPrint("接続されている画面数: \(NSScreen.screens.count)")
@@ -790,7 +809,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = WindowTimingSettings.shared
         let totalDelay = settings.windowRestoreDelay
         
-        debugPrint("復元まで \(totalDelay)秒待機")
+        debugPrint("復元まで \(String(format: "%.1f", totalDelay))秒待機") // 秒数の表示スタイル調整
         
         let workItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
@@ -804,7 +823,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             } else if NSScreen.screens.count >= 2 && self.restoreRetryCount < self.maxRestoreRetries {
                 // 復元失敗でリトライ可能な場合
                 self.restoreRetryCount += 1
-                debugPrint("🔄 復元リトライ予約（\(self.restoreRetryCount)/\(self.maxRestoreRetries)）: \(self.restoreRetryDelay)秒後")
+                debugPrint("🔄 復元リトライ予約（\(self.restoreRetryCount)/\(self.maxRestoreRetries)）: \(String(format: "%.1f", self.restoreRetryDelay))秒後") // 表示スタイル調整
                 
                 // リトライをスケジュール
                 DispatchQueue.main.asyncAfter(deadline: .now() + self.restoreRetryDelay) { [weak self] in
@@ -1104,10 +1123,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                     // 保存された座標に移動
                                     var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
                                     if let positionValue = AXValueCreate(.cgPoint, &position) {
-                                        let setResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
-                                        if setResult == .success {
+                                        let posResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
+                                        
+                                        // サイズも復元
+                                        var size = CGSize(width: savedFrame.width, height: savedFrame.height)
+                                        var sizeRestored = false
+                                        if let sizeValue = AXValueCreate(.cgSize, &size) {
+                                            let sizeResult = AXUIElementSetAttributeValue(axWindow, kAXSizeAttribute as CFString, sizeValue)
+                                            sizeRestored = (sizeResult == .success)
+                                        }
+                                        
+                                        if posResult == .success {
                                             restoredCount += 1
-                                            debugPrint("  ✅ \(ownerName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元")
+                                            let sizeInfo = sizeRestored ? "+サイズ" : ""
+                                            debugPrint("    ✅ \(ownerName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
+                                        } else {
+                                            debugPrint("    ❌ \(ownerName) の移動失敗: \(posResult.rawValue)")
                                         }
                                     }
                                     break
@@ -1378,12 +1409,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                     // 保存された座標に移動
                                     var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
                                     if let positionValue = AXValueCreate(.cgPoint, &position) {
-                                        let setResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
-                                        if setResult == .success {
+                                        let posResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
+                                        
+                                        // サイズも復元
+                                        var size = CGSize(width: savedFrame.width, height: savedFrame.height)
+                                        var sizeRestored = false
+                                        if let sizeValue = AXValueCreate(.cgSize, &size) {
+                                            let sizeResult = AXUIElementSetAttributeValue(axWindow, kAXSizeAttribute as CFString, sizeValue)
+                                            sizeRestored = (sizeResult == .success)
+                                        }
+                                        
+                                        if posResult == .success {
                                             restoredCount += 1
-                                            debugPrint("    ✅ \(ownerName) を (\(savedFrame.origin.x), \(savedFrame.origin.y)) に復元")
+                                            let sizeInfo = sizeRestored ? "+サイズ" : ""
+                                            debugPrint("    ✅ \(ownerName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
                                         } else {
-                                            debugPrint("    ❌ \(ownerName) の移動失敗: \(setResult.rawValue)")
+                                            debugPrint("    ❌ \(ownerName) の移動失敗: \(posResult.rawValue)")
                                         }
                                     }
                                     matchFound = true

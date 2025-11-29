@@ -57,8 +57,8 @@ class HotKeySettings: ObservableObject {
     }
     
     private init() {
-        // デフォルト値: Ctrl + Option + Command
-        self.useControl = UserDefaults.standard.object(forKey: "useControl") as? Bool ?? true
+        // デフォルト値: Ctrl + Command
+        self.useControl = UserDefaults.standard.object(forKey: "useControl") as? Bool ?? false
         self.useOption = UserDefaults.standard.object(forKey: "useOption") as? Bool ?? true
         self.useShift = UserDefaults.standard.object(forKey: "useShift") as? Bool ?? false
         self.useCommand = UserDefaults.standard.object(forKey: "useCommand") as? Bool ?? true
@@ -292,6 +292,8 @@ class SnapshotSettings: ObservableObject {
     private let soundNameKey = "snapshotSoundName"
     private let disablePersistenceKey = "snapshotDisablePersistence"
     private let verboseLoggingKey = "snapshotVerboseLogging"
+    private let restoreOnLaunchKey = "snapshotRestoreOnLaunch"
+    private let showMillisecondsKey = "debugShowMilliseconds"
     
     /// 利用可能なシステムサウンド
     static let availableSounds = [
@@ -321,6 +323,13 @@ class SnapshotSettings: ObservableObject {
         }
     }
     
+    /// アプリ起動時に自動復元
+    @Published var restoreOnLaunch: Bool {
+        didSet {
+            defaults.set(restoreOnLaunch, forKey: restoreOnLaunchKey)
+        }
+    }
+    
     /// スナップショットを永続化しない（プライバシー保護モード）
     @Published var disablePersistence: Bool {
         didSet {
@@ -339,6 +348,13 @@ class SnapshotSettings: ObservableObject {
         }
     }
     
+    /// ログにミリ秒を表示
+    @Published var showMilliseconds: Bool {
+        didSet {
+            defaults.set(showMilliseconds, forKey: showMillisecondsKey)
+        }
+    }
+    
     private init() {
         self.initialSnapshotDelay = defaults.object(forKey: initialDelayKey) as? Double ?? 15.0
         self.enablePeriodicSnapshot = defaults.object(forKey: enablePeriodicKey) as? Bool ?? false
@@ -350,6 +366,8 @@ class SnapshotSettings: ObservableObject {
         self.enableNotification = defaults.object(forKey: enableNotificationKey) as? Bool ?? false
         self.disablePersistence = defaults.object(forKey: disablePersistenceKey) as? Bool ?? false
         self.verboseLogging = defaults.object(forKey: verboseLoggingKey) as? Bool ?? false
+        self.restoreOnLaunch = defaults.object(forKey: restoreOnLaunchKey) as? Bool ?? false
+        self.showMilliseconds = defaults.object(forKey: showMillisecondsKey) as? Bool ?? false
     }
     
     /// サウンドをプレビュー再生
@@ -593,6 +611,14 @@ struct SettingsView: View {
             // 自動スナップショット
             GroupBox(label: Text("自動スナップショット").font(.headline)) {
                 VStack(alignment: .leading, spacing: 10) {
+                    Toggle("アプリ起動時に自動復元", isOn: $snapshotSettings.restoreOnLaunch)
+                    
+                    Text("起動時に保存済みスナップショットを復元します")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Divider()
+                    
                     HStack {
                         Text("初回取得までの時間:")
                             .font(.subheadline)
@@ -693,11 +719,13 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                     
                     Toggle("詳細ログを出力", isOn: $snapshotSettings.verboseLogging)
-                    
+
+                    Toggle("ミリ秒を表示", isOn: $snapshotSettings.showMilliseconds)
+
                     Text("スナップショット保存・復元時の詳細情報をログに出力します")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     Divider()
                     
                     // 保存状態
@@ -855,6 +883,8 @@ struct SettingsView: View {
         snapshotSettings.enableSound = true
         snapshotSettings.soundName = "Blow"
         snapshotSettings.enableNotification = false
+        snapshotSettings.restoreOnLaunch = false
+        snapshotSettings.showMilliseconds = false
     }
     
     private func formatMinutes(_ minutes: Double) -> String {
