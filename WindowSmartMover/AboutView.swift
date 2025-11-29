@@ -21,7 +21,7 @@ struct AboutView: View {
         Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "WindowSmartMover"
     }
     
-    private let githubURL = "https://github.com/zembutsu/WindowSmartMover"
+    private let githubURL = "https://github.com/zembutsu/tsubame"
     
     @Environment(\.dismiss) var dismiss
     
@@ -123,7 +123,7 @@ struct AboutView: View {
                         Text("GitHub")
                             .frame(width: 70, alignment: .leading)
                             .font(.subheadline)
-                        Link("zembutsu/WindowSmartMover", destination: URL(string: githubURL)!)
+                        Link("zembutsu/tsubame", destination: URL(string: githubURL)!)
                             .font(.subheadline)
                     }
                 }
