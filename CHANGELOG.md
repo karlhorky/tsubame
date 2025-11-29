@@ -8,7 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Future Tasks
-- Format floating-point delay display (e.g., `3.0000000000000004` → `3.0`)
+- Internationalization (i18n) - English default + Japanese localization
+
+## [1.2.7] - 2025-11-29
+
+### Added
+- **Window Size Restoration**
+  - Both position and size are now restored (previously position-only)
+  - Preserves your exact window dimensions after restoration
+  - Works for both manual snapshot restore and auto-restore on display reconnection
+- **Restore on Launch Option**
+  - New setting: "Restore on launch" in Settings → Snapshot
+  - Automatically restores saved snapshot when app starts
+  - Uses existing window restore delay setting for timing
+  - Only triggers when external display is connected
+- **Millisecond Timestamp in Debug Logs**
+  - New setting: "Show milliseconds" in Settings → Debug
+  - Enables `HH:mm:ss.SSS` format for precise timing analysis
+  - Useful for troubleshooting timing-related issues
+
+### Changed
+- **Default Hotkey Modifier** (#5)
+  - Changed from `⌃⌥⌘` (Control+Option+Command) to `⌃⌘` (Control+Command)
+  - Simpler key combination, easier to press
+  - Existing users' settings are preserved (stored in UserDefaults)
+  - New installations will use the new default
+
+### Fixed
+- **Floating-point Display in Debug Logs**
+  - Fixed display of timing values like `3.0000000000000004` → `3.0`
+  - All timing-related log messages now use formatted output
+
+### Removed
+- **Unused ContentView.swift**
+  - Removed default template file that was not being used
+
+### Technical Details
+- Added `restoreOnLaunch` property to `SnapshotSettings`
+- Added `showMilliseconds` property to `SnapshotSettings`
+- Modified `DebugLogger.addLog()` to support millisecond formatting
+- Modified `restoreWindowsIfNeeded()` to restore window size via `kAXSizeAttribute`
+- Modified `restoreManualSnapshot()` to restore window size
+- Updated `resetToDefaults()` to include new settings
 
 ## [1.2.6] - 2025-11-29
 
@@ -82,7 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Migration Notes
 - **Breaking change**: Saved snapshots from v1.2.x will be cleared
-- After upgrading, use ⌃⌥⌘↑ to save a new snapshot
+- After upgrading, use ⌃⌘↑ to save a new snapshot
 - Privacy protection mode is OFF by default (existing behavior preserved)
 
 ### Planned (Future)
@@ -97,7 +138,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Future Considerations (Post v1.2.6)
 - Per-app window restoration rules
-- Window size restoration (currently position only)
 - Support for more than 2 displays
 - Export/Import snapshots as JSON
 
@@ -169,93 +209,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - App name displayed as "Tsubame - Window Smart Mover"
   - Version and build info (auto-generated)
   - Keyboard shortcuts reference
-  - Developer credits and license info
-  - GitHub link
 - **Automated Version Management**
-  - VERSION file for centralized version control
+  - VERSION file defines major.minor.patch version
   - Build number auto-generated from git commit count
-  - Xcode Build Phase script integration
+  - Integrated into Xcode build process via script
 
 ### Changed
-- **Settings UI reorganized with tabs**
-  - Basic tab: Shortcuts, Window Nudge, Auto Snapshot
-  - Advanced tab: Restore Timing, Sleep Settings
-  - Compact 520x620 window size (no more scrolling/cut-off)
-- Default initial snapshot delay increased from 5 min to 15 min
-- Settings window UI improved: Sliders replaced with Steppers for most settings
-- Improved log messages to distinguish between different snapshot systems
-- Timer implementation changed to RunLoop `.common` mode for reliability
+- Unified Settings dialog layout with Basic/Advanced tabs
+- Improved Settings UI with Stepper controls for precise value adjustment
+- About window now uses DateFormatter for real-time display
+- Menu item "About WindowSmartMover" → "About Tsubame"
+
+### Fixed
+- Menu bar snapshot status not updating after save operations
+- About window showing stale build information
 
 ### Technical Details
-- Added `SnapshotSettings` class with `protectExistingSnapshot` and `minimumWindowCount`
-- Added `ManualSnapshotStorage` class for snapshot persistence using JSON encoding
-- Added `displayMemoryInterval` to `WindowTimingSettings` class
-- Added `nudgePixels` to `HotKeySettings` class
-- Added `NudgeDirection` enum and `nudgeWindow()` method
-- Registered hotKeyRef5-8 for W/A/S/D keys
-- Settings UI uses `GroupBox` and `Picker` for tab navigation
-- Snapshot protection logic in `performAutoSnapshot()`
-- Added `VERSION` file for centralized version management
-- Build number auto-generated from git commit count via Xcode Build Phase script
+- Added `SnapshotSettings` class for auto-snapshot configuration
+- Added `ManualSnapshotStorage` class for UserDefaults persistence
+- Added `performAutoSnapshot()` with existing data protection
+- Added `schedulePostDisplayConnectionSnapshot()` for display event handling
+- Added `nudgeWindow(direction:)` for pixel-level window movement
+- Added notification permission request via `UNUserNotificationCenter`
+- Implemented VERSION file parsing and build number generation
+- Timer execution uses `.common` RunLoop mode for reliability
 
-### Migration Notes
-- Existing users: No action required, snapshots from v1.2.3 were memory-only
-- New default behavior: Auto-snapshot 15 minutes after launch with data protection enabled
-
-## [1.2.3] - 2025-11-26
+## [1.2.3] - 2025-11-27
 
 ### Added
 - **Manual Window Snapshot & Restore** (MVP implementation)
-  - Save current window layout: Ctrl+Cmd+↑ (uses existing modifier key settings)
-  - Restore saved layout: Ctrl+Cmd+↓ (uses existing modifier key settings)
-  - Menu bar commands for snapshot operations (📸 配置を保存 / 📥 配置を復元)
-  - Internal 5-slot structure prepared for future multi-slot expansion
-  - Independent from automatic display reconnection restoration
+  - Save: Captures current window positions for all displays
+  - Restore: Returns windows to their saved positions
+  - Works independently from automatic display reconnection restore
+- **Keyboard Shortcuts for Snapshot Operations**
+  - `⌃⌘↑` Save current window layout (snapshot)
+  - `⌃⌘↓` Restore saved window layout
+- **Menu Bar Commands**
+  - "📸 Save Layout" - same as keyboard shortcut
+  - "📥 Restore Layout" - same as keyboard shortcut
 
-### Limitations
-- ~~Snapshots are stored in memory only and cleared when app exits~~ (Fixed in v1.2.4)
-- Windows that have been restarted cannot be restored (CGWindowID changes)
-- Fullscreen and minimized windows are not included in snapshots
-
-### Technical Details
-- Added `hotKeyRef3` (ID:3) and `hotKeyRef4` (ID:4) for up/down arrow keys
-- Implemented `manualSnapshots` array with 5 slots for future expansion
-- `saveManualSnapshot()` captures all on-screen windows with layer 0
-- `restoreManualSnapshot()` uses Accessibility API to reposition windows
-- Reuses existing `HotKeySettings` modifier configuration
-
-## [1.2.2] - 2025-11-25
-
-### Fixed
-- **Critical**: Stabilization timer reset issue during continuous display events (#7)
-  - Changed from one-shot timer to periodic check (0.5s interval)
-  - Now properly waits for elapsed time since the last event
-  - Resolves window restoration failures after long sleep periods
-- Debug log window now shows latest logs on each open
-  - Previously cached logs from first open
+### Known Limitations
+- Fullscreen and minimized windows are excluded from snapshot
+- Single snapshot slot (slot selection planned for future)
+- Snapshot data is not persisted (memory only)
 
 ### Technical Details
-- Implemented `stabilizationCheckTimer` with 0.5s repeating interval
-- Records display events continuously during monitoring suspension
-- Calculates elapsed time from `lastDisplayChangeTime` for true stabilization detection
-- Debug log window recreated on each open instead of reusing cached instance
+- Internal slot-based architecture prepared (5 slots, currently using slot 0 only)
+- Snapshot stored as `[displayID: [windowKey: CGRect]]` dictionary
+- Window identification using app name + CGWindowID combination
 
-### Testing
-- Verified with 1 week of continuous operation testing
-- Confirmed reliable window restoration after sleep/wake cycles
-
-## [1.2.1] - 2025-11-15
+## [1.2.2] - 2025-11-26
 
 ### Added
-- Extended timing configuration range to 15 seconds for slower display hardware
-  - Both stabilization and restore delays now configurable from 0.1s to 15.0s
-  - Enables support for wide range of display types and connection methods
-- Current time display in About dialog
-  - Shows real-time timestamp for debugging and version verification
-  - Helps correlate app behavior with system logs
+- Enhanced debug log for restore delay value tracing
+- Detailed screen position information in restore logs
 
 ### Changed
-- **Default timing values significantly increased for better reliability**
+- Default timing values increased for maximum compatibility
   - Display stabilization delay: 0.5s → 6.0s (default)
   - Window restore delay: 2.5s → 6.0s (default)
   - Total default wait time: 12 seconds (provides maximum compatibility)

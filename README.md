@@ -4,11 +4,6 @@
 
 A lightweight macOS menu bar app for effortless window management across multiple displays.
 
-
-> **⚠️ Note**: v1.1.0 is not yet notarized by Apple. macOS 15+ users may experience security blocks. 
-> A notarized version (v1.1.1) is coming soon.
-
-
 ![macOS](https://img.shields.io/badge/macOS-14.0+-blue)
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -19,8 +14,8 @@ A lightweight macOS menu bar app for effortless window management across multipl
 
 ### Core Functionality
 - **Keyboard Shortcuts**: Move windows between displays instantly
-  - `⌃⌥⌘→` Move to next display
-  - `⌃⌥⌘←` Move to previous display
+  - `⌃⌘→` Move to next display
+  - `⌃⌘←` Move to previous display
 - **Customizable Hotkeys**: Configure modifier keys (Control, Option, Shift, Command)
 - **Menu Bar Integration**: Lightweight, stays out of your way
 
@@ -41,8 +36,8 @@ A lightweight macOS menu bar app for effortless window management across multipl
 
 ### Manual Snapshot (v1.2.3+)
 - **Save & Restore Window Layouts**: User-controlled window position memory
-  - `⌃⌥⌘↑` Save current window layout
-  - `⌃⌥⌘↓` Restore saved layout
+  - `⌃⌘↑` Save current window layout
+  - `⌃⌘↓` Restore saved layout
   - Menu bar commands available
 - **Independent from Auto-Restore**: Works separately from display reconnection
 - **Current Limitations**:
@@ -87,6 +82,17 @@ A lightweight macOS menu bar app for effortless window management across multipl
   - Option to disable snapshot persistence entirely
   - All data cleared on app quit
   - Enable in Settings → Snapshot → "Don't persist snapshots"
+
+### Enhanced Restoration (v1.2.7+)
+- **Window Size Restoration**: Complete layout restoration
+  - Both position and size are now restored
+  - Preserves your exact window dimensions
+- **Restore on Launch**: Automatic restoration when app starts
+  - Optional: Enable in Settings → Snapshot → "Restore on launch"
+  - Requires saved snapshot and external display connected
+- **Improved Debug Logging**: Better troubleshooting
+  - Optional millisecond timestamps for precise timing analysis
+  - Enable in Settings → Debug → "Show milliseconds"
 
 ### Coming Soon 🚧
 
@@ -153,8 +159,8 @@ This project embodies the philosophy: **understand deeply by building yourself**
 
 ### Basic Window Movement
 1. Make sure a window is active (click on it)
-2. Press `⌃⌥⌘→` to move to the next display
-3. Press `⌃⌥⌘←` to move to the previous display
+2. Press `⌃⌘→` to move to the next display
+3. Press `⌃⌘←` to move to the previous display
 
 ### Automatic Window Restoration
 1. Use your external display normally
@@ -203,32 +209,14 @@ open WindowSmartMover.xcodeproj
 # Build and run (⌘R)
 ```
 
-### Creating a Release Build
+### Code Signing
 
-1. In Xcode: `Product → Archive`
-2. Click `Distribute App`
-3. Select `Copy App`
-4. Choose export location
-
-## How It Works
-
-### Display Memory Technology
-- **Periodic Snapshots**: Window positions saved every 5 seconds
-- **CGWindowID Identification**: Each window uniquely identified
-- **Display Detection**: Monitors display configuration changes via `NSApplication.didChangeScreenParametersNotification`
-- **Smart Matching**: Restores windows based on app name + window ID
-
-### Technical Stack
-- **Language**: Swift 6.2
-- **UI Framework**: SwiftUI
-- **Window Control**: Accessibility API (AXUIElement)
-- **Display Management**: CoreGraphics (CGWindow, NSScreen)
-- **Hotkey Registration**: Carbon Event Manager
+For local development, you can use "Sign to Run Locally" in Xcode. For distribution, you'll need an Apple Developer account.
 
 ## Known Issues
 
-### Window Management
-- Some apps (e.g., system preferences) may not support window movement via Accessibility API
+### Window Control
+- Some apps (e.g., system dialogs) don't respond to programmatic window control
 - Fullscreen windows cannot be moved
 - Display reconnection timing may vary by hardware
 
@@ -291,6 +279,13 @@ No sensitive information is logged or transmitted.
 
 ## Roadmap
 
+### Completed (v1.2.7)
+- [x] Changed default hotkey from ⌃⌥⌘ to ⌃⌘ (#5)
+- [x] Window size restoration (position + size)
+- [x] Restore on launch option
+- [x] Millisecond timestamp option in debug logs
+- [x] Fixed floating-point display in logs
+
 ### Completed (v1.2.6)
 - [x] Privacy-aware window matching (SHA256 hashing for app names and titles)
 - [x] Window restoration after app restart (CGWindowID limitation fixed)
@@ -335,14 +330,14 @@ No sensitive information is logged or transmitted.
 - [x] Enhanced window position detection logic
 - [x] Debug log viewer with copy functionality
 
-### In Development (v1.4.0)
-- [ ] Enhanced snapshot features (multiple slots with UI selection)
-- [ ] Snapshot management interface (list, rename, delete)
+### In Development (v1.3.0)
 - [ ] Internationalization (English UI + Japanese localization)
 - [ ] Localized debug logs
+- [ ] App Store release preparation
 
-### Future Considerations (Post v1.4.0)
-- [ ] Window size restoration (currently position only)
+### Future Considerations (Post v1.3.0)
+- [ ] Enhanced snapshot features (multiple slots with UI selection)
+- [ ] Snapshot management interface (list, rename, delete)
 - [ ] Support for more than 2 displays
 - [ ] Per-app window restoration rules
 - [ ] Export/Import snapshots as JSON
