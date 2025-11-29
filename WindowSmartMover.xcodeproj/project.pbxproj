@@ -6,14 +6,52 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A9B765F02EDAD58000C459F4 /* WindowMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9B765EF2EDAD58000C459F4 /* WindowMatcher.swift */; };
+		A9B765F12EDAD58000C459F4 /* WindowMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9B765EF2EDAD58000C459F4 /* WindowMatcher.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A9B765E52EDACFC700C459F4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A915930E2EA31AD10079F482 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A91593152EA31AD10079F482;
+			remoteInfo = WindowSmartMover;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		A91593162EA31AD10079F482 /* WindowSmartMover.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WindowSmartMover.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A9B765E12EDACFC700C459F4 /* TsubameTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TsubameTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A9B765EF2EDAD58000C459F4 /* WindowMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowMatcher.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A9B765EB2EDAD2AE00C459F4 /* Exceptions for "WindowSmartMover" folder in "TsubameTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AboutView.swift,
+				AppDelegate.swift,
+				SettingsView.swift,
+				WindowSmartMoverApp.swift,
+			);
+			target = A9B765E02EDACFC700C459F4 /* TsubameTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A91593182EA31AD10079F482 /* WindowSmartMover */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A9B765EB2EDAD2AE00C459F4 /* Exceptions for "WindowSmartMover" folder in "TsubameTests" target */,
+			);
 			path = WindowSmartMover;
+			sourceTree = "<group>";
+		};
+		A9B765E22EDACFC700C459F4 /* TsubameTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TsubameTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -26,13 +64,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A9B765DE2EDACFC700C459F4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		A915930D2EA31AD10079F482 = {
 			isa = PBXGroup;
 			children = (
+				A9B765EF2EDAD58000C459F4 /* WindowMatcher.swift */,
 				A91593182EA31AD10079F482 /* WindowSmartMover */,
+				A9B765E22EDACFC700C459F4 /* TsubameTests */,
 				A91593172EA31AD10079F482 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +88,7 @@
 			isa = PBXGroup;
 			children = (
 				A91593162EA31AD10079F482 /* WindowSmartMover.app */,
+				A9B765E12EDACFC700C459F4 /* TsubameTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -71,6 +119,29 @@
 			productReference = A91593162EA31AD10079F482 /* WindowSmartMover.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A9B765E02EDACFC700C459F4 /* TsubameTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A9B765E92EDACFC700C459F4 /* Build configuration list for PBXNativeTarget "TsubameTests" */;
+			buildPhases = (
+				A9B765DD2EDACFC700C459F4 /* Sources */,
+				A9B765DE2EDACFC700C459F4 /* Frameworks */,
+				A9B765DF2EDACFC700C459F4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A9B765E62EDACFC700C459F4 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A9B765E22EDACFC700C459F4 /* TsubameTests */,
+			);
+			name = TsubameTests;
+			packageProductDependencies = (
+			);
+			productName = TsubameTests;
+			productReference = A9B765E12EDACFC700C459F4 /* TsubameTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -78,11 +149,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2600;
+				LastSwiftUpdateCheck = 2610;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					A91593152EA31AD10079F482 = {
 						CreatedOnToolsVersion = 26.0.1;
+					};
+					A9B765E02EDACFC700C459F4 = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = A91593152EA31AD10079F482;
 					};
 				};
 			};
@@ -101,12 +176,20 @@
 			projectRoot = "";
 			targets = (
 				A91593152EA31AD10079F482 /* WindowSmartMover */,
+				A9B765E02EDACFC700C459F4 /* TsubameTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A91593142EA31AD10079F482 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A9B765DF2EDACFC700C459F4 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -141,10 +224,27 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A9B765F12EDAD58000C459F4 /* WindowMatcher.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A9B765DD2EDACFC700C459F4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A9B765F02EDAD58000C459F4 /* WindowMatcher.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A9B765E62EDACFC700C459F4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A91593152EA31AD10079F482 /* WindowSmartMover */;
+			targetProxy = A9B765E52EDACFC700C459F4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A915931F2EA31AD20079F482 /* Debug */ = {
@@ -333,6 +433,48 @@
 			};
 			name = Release;
 		};
+		A9B765E72EDACFC700C459F4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ARN3XWB4DF;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jp.pocketstudio.zem.TsubameTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WindowSmartMover.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WindowSmartMover";
+			};
+			name = Debug;
+		};
+		A9B765E82EDACFC700C459F4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ARN3XWB4DF;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jp.pocketstudio.zem.TsubameTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WindowSmartMover.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WindowSmartMover";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -350,6 +492,15 @@
 			buildConfigurations = (
 				A91593222EA31AD20079F482 /* Debug */,
 				A91593232EA31AD20079F482 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A9B765E92EDACFC700C459F4 /* Build configuration list for PBXNativeTarget "TsubameTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A9B765E72EDACFC700C459F4 /* Debug */,
+				A9B765E82EDACFC700C459F4 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
