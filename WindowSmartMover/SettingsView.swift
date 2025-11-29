@@ -6,6 +6,58 @@ import CryptoKit
 
 // MARK: - Window Matching Data Structure
 
+// MARK: - Language Settings
+enum AppLanguage: String, CaseIterable {
+    case system = "system"
+    case english = "en"
+    case japanese = "ja"
+    
+    var displayName: String {
+        switch self {
+        case .system: return NSLocalizedString("System Default", comment: "Language option")
+        case .english: return "English"
+        case .japanese: return "日本語"
+        }
+    }
+}
+
+class LanguageSettings: ObservableObject {
+    static let shared = LanguageSettings()
+    
+    private let languageKey = "AppLanguage"
+    
+    @Published var selectedLanguage: AppLanguage {
+        didSet {
+            applyLanguage(selectedLanguage)
+        }
+    }
+    
+    private init() {
+        // Load saved setting
+        if let saved = UserDefaults.standard.string(forKey: languageKey),
+           let language = AppLanguage(rawValue: saved) {
+            self.selectedLanguage = language
+        } else {
+            self.selectedLanguage = .system
+        }
+    }
+    
+    private func applyLanguage(_ language: AppLanguage) {
+        UserDefaults.standard.set(language.rawValue, forKey: languageKey)
+        
+        switch language {
+        case .system:
+            // Remove override, use system language
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        case .english, .japanese:
+            // Set specific language
+            UserDefaults.standard.set([language.rawValue], forKey: "AppleLanguages")
+        }
+        
+        UserDefaults.standard.synchronize()
+    }
+}
+
 /// Window identification info (hashed for privacy protection)
 struct WindowMatchInfo: Codable, Equatable {
     let appNameHash: String      // SHA256(appName)
@@ -470,8 +522,10 @@ struct SettingsView: View {
     @ObservedObject var settings = HotKeySettings.shared
     @ObservedObject var timingSettings = WindowTimingSettings.shared
     @ObservedObject var snapshotSettings = SnapshotSettings.shared
+    @ObservedObject var languageSettings = LanguageSettings.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedTab = 0
+    @State private var showRestartAlert = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -522,12 +576,39 @@ struct SettingsView: View {
         }
         .padding()
         .frame(width: 520, height: 620)
+        .alert(NSLocalizedString("Restart Required", comment: "Alert title"), isPresented: $showRestartAlert) {
+            Button(NSLocalizedString("Restart Now", comment: "Alert button")) {
+                restartApp()
+            }
+            Button(NSLocalizedString("Later", comment: "Alert button"), role: .cancel) {}
+        } message: {
+            Text(NSLocalizedString("Please restart the app to apply the language change.", comment: "Alert message"))
+        }
     }
     
     // MARK: - Basic Settings Tab
     
     private var basicSettingsContent: some View {
         VStack(spacing: 16) {
+            // Language
+            GroupBox(label: Text(NSLocalizedString("Language", comment: "")).font(.headline)) {
+                HStack {
+                    Picker(NSLocalizedString("Display Language:", comment: ""), selection: $languageSettings.selectedLanguage) {
+                        ForEach(AppLanguage.allCases, id: \.self) { language in
+                            Text(language.displayName).tag(language)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .onChange(of: languageSettings.selectedLanguage) { oldValue, newValue in
+                        showRestartAlert = true
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+            }
+            .padding(.horizontal)
+            
             // Shortcut keys
             GroupBox(label: Text(NSLocalizedString("Shortcut Keys", comment: "")).font(.headline)) {
                 VStack(alignment: .leading, spacing: 10) {
@@ -877,6 +958,17 @@ struct SettingsView: View {
     }
     
     // MARK: - Helper Functions
+    
+    private func restartApp() {
+        let url = URL(fileURLWithPath: Bundle.main.resourcePath!)
+        let path = url.deletingLastPathComponent().deletingLastPathComponent().absoluteString
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = [path]
+        task.launch()
+        
+        NSApplication.shared.terminate(nil)
+    }
     
     private func resetToDefaults() {
         settings.useControl = true

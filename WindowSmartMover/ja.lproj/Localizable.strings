@@ -38,6 +38,16 @@
 "Reset to Defaults" = "デフォルトに戻す";
 "⚠️ Some settings require restart" = "⚠️ 一部の設定は再起動が必要";
 
+// MARK: - Settings View - Language
+
+"Language" = "言語";
+"Display Language:" = "表示言語：";
+"System Default" = "システム設定に従う";
+"Restart Required" = "再起動が必要";
+"Restart Now" = "今すぐ再起動";
+"Later" = "あとで";
+"Please restart the app to apply the language change." = "言語設定を反映するにはアプリを再起動してください。";
+
 // MARK: - Settings View - Shortcut Keys
 
 "Shortcut Keys" = "ショートカットキー";
