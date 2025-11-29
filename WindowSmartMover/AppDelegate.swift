@@ -53,6 +53,10 @@ class DebugLogger {
     private var logs: [String] = []
     private let maxLogs = 1000
     
+    // アプリ名マスク用のマッピング
+    private var appNameMapping: [String: String] = [:]
+    private var appCounter = 0
+    
     func addLog(_ message: String) {
         let timestamp: String
         if SnapshotSettings.shared.showMilliseconds {
@@ -77,6 +81,26 @@ class DebugLogger {
     
     func clearLogs() {
         logs.removeAll()
+    }
+    
+    /// アプリ名をマスクする（設定に応じて）
+    func maskAppName(_ name: String) -> String {
+        guard SnapshotSettings.shared.maskAppNamesInLog else {
+            return name  // マスクOFFなら元の名前
+        }
+        if let masked = appNameMapping[name] {
+            return masked
+        }
+        appCounter += 1
+        let masked = "App\(appCounter)"
+        appNameMapping[name] = masked
+        return masked
+    }
+    
+    /// アプリ名マッピングをクリア
+    func clearAppNameMapping() {
+        appNameMapping.removeAll()
+        appCounter = 0
     }
 }
 
@@ -191,6 +215,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // SnapshotSettingsを初期化
         _ = SnapshotSettings.shared
+        
+        // 起動時情報をログに出力
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
+        debugPrint("========== Tsubame v\(version) (build \(build)) ==========")
+        debugPrint("Settings:")
+        debugPrint("  Hotkey: \(HotKeySettings.shared.getModifierString())")
+        debugPrint("  Display stabilization: \(String(format: "%.1f", WindowTimingSettings.shared.displayStabilizationDelay))s")
+        debugPrint("  Window restore delay: \(String(format: "%.1f", WindowTimingSettings.shared.windowRestoreDelay))s")
+        debugPrint("  Restore on launch: \(SnapshotSettings.shared.restoreOnLaunch ? "ON" : "OFF")")
+        debugPrint("  Verbose logging: \(SnapshotSettings.shared.verboseLogging ? "ON" : "OFF")")
+        debugPrint("  Mask app names: \(SnapshotSettings.shared.maskAppNamesInLog ? "ON" : "OFF")")
+        debugPrint("================================================")
         
         // 保存済みスナップショットを読み込み
         loadSavedSnapshots()
