@@ -63,7 +63,8 @@ class DebugLogger {
             timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
         }
         let logEntry = "[\(timestamp)] \(message)"
-    
+        logs.append(logEntry)
+        
         // ログが多すぎる場合は古いものを削除
         if logs.count > maxLogs {
             logs.removeFirst(logs.count - maxLogs)
