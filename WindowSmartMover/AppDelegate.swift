@@ -606,8 +606,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Get current position
+        // Note: CoreFoundation type casts (AXUIElement, AXValue) always succeed after API success check
+        let axWindow = window as! AXUIElement
+        
         var positionRef: AnyObject?
-        AXUIElementCopyAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, &positionRef)
+        AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &positionRef)
         
         guard let positionValue = positionRef else {
             debugPrint("❌ Failed to get window position")
@@ -632,7 +635,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Update position
         if let newPositionValue = AXValueCreate(.cgPoint, &newPosition) {
-            let setResult = AXUIElementSetAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, newPositionValue)
+            let setResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, newPositionValue)
             if setResult == .success {
                 debugPrint("✅ Window moved to (\(Int(newPosition.x)), \(Int(newPosition.y)))")
             } else {
@@ -666,11 +669,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("✅ Got focused window")
         
         // Get current position and size
+        // Note: CoreFoundation type casts always succeed after API success check
+        let axWindow = window as! AXUIElement
+        
         var positionRef: AnyObject?
         var sizeRef: AnyObject?
         
-        AXUIElementCopyAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, &positionRef)
-        AXUIElementCopyAttributeValue(window as! AXUIElement, kAXSizeAttribute as CFString, &sizeRef)
+        AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &positionRef)
+        AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &sizeRef)
         
         guard let positionValue = positionRef, let sizeValue = sizeRef else {
             debugPrint("❌ Failed to get window position/size")
@@ -731,7 +737,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Move window
         if let positionValue = AXValueCreate(.cgPoint, &newPosition) {
-            let setResult = AXUIElementSetAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, positionValue)
+            let setResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
             
             if setResult == .success {
                 debugPrint("✅ Window moved successfully")
@@ -1164,6 +1170,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
                            let currentPosValue = currentPosRef {
                             var currentPoint = CGPoint.zero
+                            // CoreFoundation type cast always succeeds after API success
                             if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
                                 // Check if current position matches current window position
                                 if abs(currentPoint.x - currentFrame.origin.x) < 10 &&
@@ -1450,6 +1457,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
                            let currentPosValue = currentPosRef {
                             var currentPoint = CGPoint.zero
+                            // CoreFoundation type cast always succeeds after API success
                             if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
                                 // Check if current position matches current window position
                                 if abs(currentPoint.x - currentFrame.origin.x) < 50 &&
