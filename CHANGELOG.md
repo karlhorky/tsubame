@@ -34,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Maintains consistency within session (same app = same identifier)
   - Users can safely share logs in GitHub issues without exposing app usage
 
+### Fixed
+- **Crash prevention in Accessibility API calls** (#27)
+  - Added nil checks before force casting AXUIElement and AXValue types
+  - Validates API success status before accessing return values
+  - Prevents crashes when Accessibility API returns unexpected states
+  - Affected methods: nudgeWindow, moveWindow, restoreManualSnapshot, restoreWindowsIfNeeded
+
 ### Changed
 - **Repository renamed** (#10)
   - GitHub repository: `WindowSmartMover` → `tsubame`
@@ -61,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `HashSaltManager` singleton class for salt generation and caching
 - Modified `WindowMatchInfo.hash()` to use salted input
 - Added `import Security` for `SecRandomCopyBytes`
+- Added guard statements for `positionRef` and `sizeRef` nil checks
+- CoreFoundation types require `as!` but are now protected by prior API success validation
 
 ### Migration Notes
 - Existing snapshots will not match after upgrade (different hash values)
