@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaces app names with generic identifiers (App1, App2, etc.)
   - Maintains consistency within session (same app = same identifier)
   - Users can safely share logs in GitHub issues without exposing app usage
+- **Hotkey Registration Failure Warning** (#31)
+  - Display alert dialog on startup if any hotkey registration fails
+  - Shows which shortcuts failed and suggests solutions
+  - "Open Settings" button for quick access to change modifier keys
+  - Helps users identify conflicts with other apps or system shortcuts
 
 ### Fixed
 - **Error logging for snapshot operations** (#29)
@@ -74,6 +79,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `import Security` for `SecRandomCopyBytes`
 - Added guard statements for `positionRef` and `sizeRef` nil checks
 - CoreFoundation types require `as!` but are now protected by prior API success validation
+- Added `showHotkeyRegistrationWarning()` method with NSAlert
+- Modified `registerHotKeys()` to return list of failed registrations
+- Added `unregisterHotKeys()` for cleanup (preparation for #25)
+- Refactored hotkey registration from repetitive code to loop-based implementation
 
 ### Migration Notes
 - Existing snapshots will not match after upgrade (different hash values)

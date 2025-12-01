@@ -136,3 +136,13 @@
 "Information" = "情報";
 "Developer" = "開発者";
 "License" = "ライセンス";
+
+
+// Add these to ja.lproj/Localizable.strings for #31
+
+// Hotkey registration warning
+"Hotkey Registration Failed" = "ホットキーの登録に失敗";
+"The following shortcuts could not be registered:\n\n%@\n\nThis usually means another app is using the same shortcut. Check System Settings → Keyboard → Shortcuts, or try different modifier keys in Tsubame Settings." = "以下のショートカットを登録できませんでした:\n\n%@\n\n通常、他のアプリが同じショートカットを使用しています。システム設定 → キーボード → ショートカットを確認するか、Tsubameの設定で別の修飾キーをお試しください。";
+"Open Settings" = "設定を開く";
+"OK" = "OK";
+

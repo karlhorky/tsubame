@@ -247,7 +247,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenu()
         
         // Register global hotkeys
-        registerHotKeys()
+        let failedHotkeys = registerHotKeys()
+        
+        // Show warning if any hotkey registration failed
+        if !failedHotkeys.isEmpty {
+            showHotkeyRegistrationWarning(failedHotkeys: failedHotkeys)
+        }
         
         // Check accessibility permissions
         checkAccessibilityPermissions()
@@ -445,7 +450,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    func registerHotKeys() {
+    /// Register hotkeys and return list of failed registrations
+    @discardableResult
+    func registerHotKeys() -> [String] {
+        var failedHotkeys: [String] = []
+        
         // Install event handler
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let status = InstallEventHandler(GetApplicationEventTarget(), hotKeyHandler, 1, &eventType, nil, &eventHandler)
@@ -459,102 +468,119 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Register hotkeys
         let settings = HotKeySettings.shared
         let modifiers = settings.getModifiers()
+        let modifierString = settings.getModifierString()
         
-        // Hotkey 1: Move to next screen (right arrow)
-        let hotKeyID1 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 1) // 'MOVE' + 1
-        let keyCode1 = UInt32(kVK_RightArrow)
-        let registerStatus1 = RegisterEventHotKey(keyCode1, modifiers, hotKeyID1, GetApplicationEventTarget(), 0, &hotKeyRef)
-        
-        if registerStatus1 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 1 (\(modifierString)→) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 1: \(registerStatus1)")
+        // Hotkey definitions: (keyCode, description, hotKeyRef pointer, id)
+        struct HotKeyDef {
+            let keyCode: UInt32
+            let symbol: String
+            let description: String
+            let id: UInt32
         }
         
-        // Hotkey 2: Move to previous screen (left arrow)
-        let hotKeyID2 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 2) // 'MOVE' + 2
-        let keyCode2 = UInt32(kVK_LeftArrow)
-        let registerStatus2 = RegisterEventHotKey(keyCode2, modifiers, hotKeyID2, GetApplicationEventTarget(), 0, &hotKeyRef2)
+        let hotKeyDefs: [HotKeyDef] = [
+            HotKeyDef(keyCode: UInt32(kVK_RightArrow), symbol: "→", description: "Move to next screen", id: 1),
+            HotKeyDef(keyCode: UInt32(kVK_LeftArrow), symbol: "←", description: "Move to previous screen", id: 2),
+            HotKeyDef(keyCode: UInt32(kVK_UpArrow), symbol: "↑", description: "Save snapshot", id: 3),
+            HotKeyDef(keyCode: UInt32(kVK_DownArrow), symbol: "↓", description: "Restore snapshot", id: 4),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_W), symbol: "W", description: "Nudge up", id: 5),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_A), symbol: "A", description: "Nudge left", id: 6),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_S), symbol: "S", description: "Nudge down", id: 7),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_D), symbol: "D", description: "Nudge right", id: 8),
+        ]
         
-        if registerStatus2 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 2 (\(modifierString)←) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 2: \(registerStatus2)")
+        // Array to store hotkey refs (index corresponds to id - 1)
+        var hotKeyRefs: [EventHotKeyRef?] = Array(repeating: nil, count: 8)
+        
+        for def in hotKeyDefs {
+            let hotKeyID = EventHotKeyID(signature: OSType(0x4D4F5645), id: def.id) // 'MOVE' + id
+            var newHotKeyRef: EventHotKeyRef?
+            let registerStatus = RegisterEventHotKey(def.keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &newHotKeyRef)
+            
+            if registerStatus == noErr {
+                debugPrint("✅ Hotkey \(def.id) (\(modifierString)\(def.symbol)) registered")
+                hotKeyRefs[Int(def.id) - 1] = newHotKeyRef
+            } else {
+                debugPrint("❌ Failed to register hotkey \(def.id): \(registerStatus)")
+                failedHotkeys.append("\(modifierString)\(def.symbol) (\(def.description))")
+            }
         }
         
-        // Hotkey 3: Save snapshot (up arrow)
-        let hotKeyID3 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 3) // 'MOVE' + 3
-        let keyCode3 = UInt32(kVK_UpArrow)
-        let registerStatus3 = RegisterEventHotKey(keyCode3, modifiers, hotKeyID3, GetApplicationEventTarget(), 0, &hotKeyRef3)
+        // Assign to instance variables
+        hotKeyRef = hotKeyRefs[0]
+        hotKeyRef2 = hotKeyRefs[1]
+        hotKeyRef3 = hotKeyRefs[2]
+        hotKeyRef4 = hotKeyRefs[3]
+        hotKeyRef5 = hotKeyRefs[4]
+        hotKeyRef6 = hotKeyRefs[5]
+        hotKeyRef7 = hotKeyRefs[6]
+        hotKeyRef8 = hotKeyRefs[7]
         
-        if registerStatus3 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 3 (\(modifierString)↑) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 3: \(registerStatus3)")
+        return failedHotkeys
+    }
+    
+    /// Show alert for failed hotkey registrations
+    private func showHotkeyRegistrationWarning(failedHotkeys: [String]) {
+        guard !failedHotkeys.isEmpty else { return }
+        
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = NSLocalizedString("Hotkey Registration Failed", comment: "Alert title for hotkey registration failure")
+        
+        let failedList = failedHotkeys.map { "• \($0)" }.joined(separator: "\n")
+        let informativeText = String(format: NSLocalizedString(
+            "The following shortcuts could not be registered:\n\n%@\n\nThis usually means another app is using the same shortcut. Check System Settings → Keyboard → Shortcuts, or try different modifier keys in Tsubame Settings.",
+            comment: "Alert message for hotkey registration failure"
+        ), failedList)
+        alert.informativeText = informativeText
+        
+        alert.addButton(withTitle: NSLocalizedString("Open Settings", comment: "Button to open settings"))
+        alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button"))
+        
+        // Show alert on main thread
+        DispatchQueue.main.async { [weak self] in
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                self?.openSettings()
+            }
         }
-        
-        // Hotkey 4: Restore snapshot (down arrow)
-        let hotKeyID4 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 4) // 'MOVE' + 4
-        let keyCode4 = UInt32(kVK_DownArrow)
-        let registerStatus4 = RegisterEventHotKey(keyCode4, modifiers, hotKeyID4, GetApplicationEventTarget(), 0, &hotKeyRef4)
-        
-        if registerStatus4 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 4 (\(modifierString)↓) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 4: \(registerStatus4)")
+    }
+    
+    /// Unregister all hotkeys (for cleanup or re-registration)
+    func unregisterHotKeys() {
+        if let hotKey = hotKeyRef {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef = nil
         }
-        
-        // Hotkey 5: Window nudge up (W)
-        let hotKeyID5 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 5) // 'MOVE' + 5
-        let keyCode5 = UInt32(kVK_ANSI_W)
-        let registerStatus5 = RegisterEventHotKey(keyCode5, modifiers, hotKeyID5, GetApplicationEventTarget(), 0, &hotKeyRef5)
-        
-        if registerStatus5 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 5 (\(modifierString)W) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 5: \(registerStatus5)")
+        if let hotKey = hotKeyRef2 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef2 = nil
         }
-        
-        // Hotkey 6: Window nudge left (A)
-        let hotKeyID6 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 6) // 'MOVE' + 6
-        let keyCode6 = UInt32(kVK_ANSI_A)
-        let registerStatus6 = RegisterEventHotKey(keyCode6, modifiers, hotKeyID6, GetApplicationEventTarget(), 0, &hotKeyRef6)
-        
-        if registerStatus6 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 6 (\(modifierString)A) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 6: \(registerStatus6)")
+        if let hotKey = hotKeyRef3 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef3 = nil
         }
-        
-        // Hotkey 7: Window nudge down (S)
-        let hotKeyID7 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 7) // 'MOVE' + 7
-        let keyCode7 = UInt32(kVK_ANSI_S)
-        let registerStatus7 = RegisterEventHotKey(keyCode7, modifiers, hotKeyID7, GetApplicationEventTarget(), 0, &hotKeyRef7)
-        
-        if registerStatus7 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 7 (\(modifierString)S) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 7: \(registerStatus7)")
+        if let hotKey = hotKeyRef4 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef4 = nil
         }
-        
-        // Hotkey 8: Window nudge right (D)
-        let hotKeyID8 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 8) // 'MOVE' + 8
-        let keyCode8 = UInt32(kVK_ANSI_D)
-        let registerStatus8 = RegisterEventHotKey(keyCode8, modifiers, hotKeyID8, GetApplicationEventTarget(), 0, &hotKeyRef8)
-        
-        if registerStatus8 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 8 (\(modifierString)D) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 8: \(registerStatus8)")
+        if let hotKey = hotKeyRef5 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef5 = nil
         }
+        if let hotKey = hotKeyRef6 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef6 = nil
+        }
+        if let hotKey = hotKeyRef7 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef7 = nil
+        }
+        if let hotKey = hotKeyRef8 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef8 = nil
+        }
+        debugPrint("🔑 All hotkeys unregistered")
     }
     
     @objc func moveWindowToNextScreen() {
@@ -1776,30 +1802,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     deinit {
         // Unregister hotkeys
-        if let hotKey = hotKeyRef {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef2 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef3 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef4 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef5 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef6 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef7 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef8 {
-            UnregisterEventHotKey(hotKey)
-        }
+        unregisterHotKeys()
         if let handler = eventHandler {
             RemoveEventHandler(handler)
         }
