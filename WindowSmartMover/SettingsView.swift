@@ -135,23 +135,41 @@ struct WindowMatchInfo: Codable, Equatable {
 class HotKeySettings: ObservableObject {
     static let shared = HotKeySettings()
     
+    /// Notification posted when modifier keys change (hotkeys need re-registration)
+    static let modifiersDidChangeNotification = Notification.Name("HotKeyModifiersDidChange")
+    
     @Published var useControl: Bool {
-        didSet { UserDefaults.standard.set(useControl, forKey: "useControl") }
+        didSet {
+            UserDefaults.standard.set(useControl, forKey: "useControl")
+            notifyModifiersChanged()
+        }
     }
     @Published var useOption: Bool {
-        didSet { UserDefaults.standard.set(useOption, forKey: "useOption") }
+        didSet {
+            UserDefaults.standard.set(useOption, forKey: "useOption")
+            notifyModifiersChanged()
+        }
     }
     @Published var useShift: Bool {
-        didSet { UserDefaults.standard.set(useShift, forKey: "useShift") }
+        didSet {
+            UserDefaults.standard.set(useShift, forKey: "useShift")
+            notifyModifiersChanged()
+        }
     }
     @Published var useCommand: Bool {
-        didSet { UserDefaults.standard.set(useCommand, forKey: "useCommand") }
+        didSet {
+            UserDefaults.standard.set(useCommand, forKey: "useCommand")
+            notifyModifiersChanged()
+        }
     }
     
     /// Window nudge pixels (10-500, default 100)
     @Published var nudgePixels: Int {
         didSet { UserDefaults.standard.set(nudgePixels, forKey: "nudgePixels") }
     }
+    
+    /// Flag to prevent notification during initialization
+    private var isInitialized = false
     
     private init() {
         // Default: Option + Command
@@ -161,6 +179,13 @@ class HotKeySettings: ObservableObject {
         self.useCommand = UserDefaults.standard.object(forKey: "useCommand") as? Bool ?? true
         // Default: 100 pixels
         self.nudgePixels = UserDefaults.standard.object(forKey: "nudgePixels") as? Int ?? 100
+        
+        isInitialized = true
+    }
+    
+    private func notifyModifiersChanged() {
+        guard isInitialized else { return }
+        NotificationCenter.default.post(name: Self.modifiersDidChangeNotification, object: nil)
     }
     
     func getModifiers() -> UInt32 {
@@ -603,7 +628,8 @@ struct SettingsView: View {
     @ObservedObject var languageSettings = LanguageSettings.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedTab = 0
-    @State private var showRestartAlert = false
+    @State private var languageChanged = false
+    @State private var initialLanguage: AppLanguage = .system
     
     var body: some View {
         VStack(spacing: 16) {
@@ -638,11 +664,20 @@ struct SettingsView: View {
                 
                 Spacer()
                 
-                Text(NSLocalizedString("⚠️ Some settings require restart", comment: "Restart warning"))
-                    .font(.caption)
-                    .foregroundColor(.orange)
-                
-                Spacer()
+                if languageChanged {
+                    HStack(spacing: 8) {
+                        Text(NSLocalizedString("🔄 Language change requires restart", comment: "Restart warning for language"))
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        
+                        Button(NSLocalizedString("Restart Now", comment: "Button to restart app")) {
+                            restartApp()
+                        }
+                        .controlSize(.small)
+                    }
+                    
+                    Spacer()
+                }
                 
                 Button(NSLocalizedString("Close", comment: "Button to close window")) {
                     dismiss()
@@ -654,13 +689,8 @@ struct SettingsView: View {
         }
         .padding()
         .frame(width: 520, height: 620)
-        .alert(NSLocalizedString("Restart Required", comment: "Alert title"), isPresented: $showRestartAlert) {
-            Button(NSLocalizedString("Restart Now", comment: "Alert button")) {
-                restartApp()
-            }
-            Button(NSLocalizedString("Later", comment: "Alert button"), role: .cancel) {}
-        } message: {
-            Text(NSLocalizedString("Please restart the app to apply the language change.", comment: "Alert message"))
+        .onAppear {
+            initialLanguage = languageSettings.selectedLanguage
         }
     }
     
@@ -668,8 +698,12 @@ struct SettingsView: View {
     
     private var basicSettingsContent: some View {
         VStack(spacing: 16) {
-            // Language
-            GroupBox(label: Text(NSLocalizedString("Language", comment: "")).font(.headline)) {
+            // Language (requires restart)
+            GroupBox(label: HStack {
+                Text(NSLocalizedString("Language", comment: ""))
+                Text("🔄")
+                    .help(NSLocalizedString("Requires app restart", comment: "Tooltip for restart required"))
+            }.font(.headline)) {
                 HStack {
                     Picker(NSLocalizedString("Display Language:", comment: ""), selection: $languageSettings.selectedLanguage) {
                         ForEach(AppLanguage.allCases, id: \.self) { language in
@@ -678,7 +712,7 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .onChange(of: languageSettings.selectedLanguage) { oldValue, newValue in
-                        showRestartAlert = true
+                        languageChanged = (newValue != initialLanguage)
                     }
                     
                     Spacer()

@@ -168,7 +168,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Display memory feature (new format: using WindowMatchInfo)
     private var windowPositions: [String: [String: WindowMatchInfo]] = [:]
-    private var snapshotTimer: Timer?
+    
+    // Timer management (delegated to TimerManager)
+    private let timerManager = TimerManager.shared
     
     // Manual snapshot feature (5 slots, for future expansion)
     // New format: using WindowMatchInfo (hashed for privacy protection)
@@ -176,15 +178,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var currentSlotIndex: Int = 0  // Always 0 in v1.2.3
     
     // Auto snapshot feature
-    private var initialSnapshotTimer: Timer?
-    private var periodicSnapshotTimer: Timer?
     private var hasInitialSnapshotBeenTaken = false
-    
-    // Display change stabilization timer
-    private var displayStabilizationTimer: Timer?
-    
-    // Restore work item (cancellable)
-    private var restoreWorkItem: DispatchWorkItem?
     
     // Display monitoring enabled/disabled state
     private var isDisplayMonitoringEnabled = true
@@ -192,14 +186,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Last display change time (for stabilization detection)
     private var lastDisplayChangeTime: Date?
     
-    // Stabilization check timer
-    private var stabilizationCheckTimer: Timer?
-    
     // Event occurred after stabilization flag
     private var eventOccurredAfterStabilization = false
-    
-    // Fallback timer
-    private var fallbackTimer: DispatchWorkItem?
     
     // Restore retry feature
     private var restoreRetryCount: Int = 0
@@ -265,6 +253,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Setup snapshot settings observers
         setupSnapshotSettingsObservers()
+        
+        // Setup hotkey settings observer
+        setupHotkeySettingsObserver()
         
         // Start periodic snapshot for display memory
         startPeriodicSnapshot()
@@ -813,24 +804,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             lastDisplayChangeTime = Date()
             
             // Start timer if not already running
-            if stabilizationCheckTimer == nil {
+            if !timerManager.isStabilizationCheckRunning {
                 startStabilizationCheck()
             }
             return
         }
         
         // If monitoring is enabled - cancel fallback and restore
-        fallbackTimer?.cancel()
+        timerManager.cancelFallback()
         eventOccurredAfterStabilization = true
         triggerRestoration()
     }
     
     /// Start stabilization check timer
     private func startStabilizationCheck() {
-        stabilizationCheckTimer?.invalidate()
-        
-        // Check stabilization every 0.5 seconds
-        stabilizationCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        timerManager.startStabilizationCheck { [weak self] in
             self?.checkStabilization()
         }
     }
@@ -845,8 +833,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if elapsed >= stabilizationDelay {
             // True stabilization achieved
-            stabilizationCheckTimer?.invalidate()
-            stabilizationCheckTimer = nil
+            timerManager.stopStabilizationCheck()
             
             isDisplayMonitoringEnabled = true
             eventOccurredAfterStabilization = false
@@ -856,11 +843,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugPrint("⏳ Waiting for next display event (max 3s)")
             
             // Setup fallback (after 3 seconds)
-            let fallback = DispatchWorkItem { [weak self] in
+            timerManager.scheduleFallback(delay: 3.0) { [weak self] in
                 self?.fallbackRestoration()
             }
-            fallbackTimer = fallback
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: fallback)
         }
     }
     
@@ -878,8 +863,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Trigger restoration process
     private func triggerRestoration(isRetry: Bool = false) {
-        // Cancel existing timer
-        restoreWorkItem?.cancel()
+        // Cancel existing restore task
+        timerManager.cancelRestore()
         
         // Reset retry counter when starting a new restore sequence
         if !isRetry {
@@ -891,7 +876,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("Waiting \(String(format: "%.1f", totalDelay))s before restore") 
         
-        let workItem = DispatchWorkItem { [weak self] in
+        timerManager.scheduleRestore(delay: totalDelay) { [weak self] in
             guard let self = self else { return }
             
             let restoredCount = self.restoreWindowsIfNeeded()
@@ -905,7 +890,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.restoreRetryCount += 1
                 debugPrint("🔄 Scheduling restore retry (\(self.restoreRetryCount)/\(self.maxRestoreRetries)): in \(String(format: "%.1f", self.restoreRetryDelay))s") 
                 
-                // Schedule retry
+                // Schedule retry (not using TimerManager - this is business logic specific retry)
                 DispatchQueue.main.asyncAfter(deadline: .now() + self.restoreRetryDelay) { [weak self] in
                     self?.triggerRestoration(isRetry: true)
                 }
@@ -914,18 +899,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 debugPrint("⏭️ Skipping snapshot scheduling (restored: \(restoredCount), screens: \(NSScreen.screens.count))")
             }
         }
-        
-        restoreWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + totalDelay, execute: workItem)
     }
     
     /// Pause monitoring
     @objc private func pauseMonitoring() {
         isDisplayMonitoringEnabled = false
         lastDisplayChangeTime = nil
-        stabilizationCheckTimer?.invalidate()
-        stabilizationCheckTimer = nil
-        fallbackTimer?.cancel()
+        timerManager.stopStabilizationCheck()
+        timerManager.cancelFallback()
         eventOccurredAfterStabilization = false
         debugPrint("⏸️ Display monitoring paused")
     }
@@ -952,7 +933,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Start periodic monitoring for display memory
     private func startPeriodicSnapshot() {
         let interval = WindowTimingSettings.shared.displayMemoryInterval
-        snapshotTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        timerManager.startDisplayMemoryTimer(interval: interval) { [weak self] in
             self?.takeWindowSnapshot()
         }
         debugPrint("✅ Periodic monitoring started (\(Int(interval))s interval)")
@@ -1584,11 +1565,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    /// Setup hotkey settings change observer
+    private func setupHotkeySettingsObserver() {
+        NotificationCenter.default.addObserver(
+            forName: HotKeySettings.modifiersDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.reregisterHotkeys()
+        }
+    }
+    
+    /// Re-register hotkeys after settings change
+    private func reregisterHotkeys() {
+        debugPrint("🔑 Hotkey modifiers changed, re-registering...")
+        
+        // Unregister existing hotkeys
+        unregisterHotKeys()
+        
+        // Register with new modifiers
+        let failedHotkeys = registerHotKeys()
+        
+        // Update menu to reflect new shortcuts
+        setupMenu()
+        
+        // Show warning if any registration failed
+        if !failedHotkeys.isEmpty {
+            showHotkeyRegistrationWarning(failedHotkeys: failedHotkeys)
+        } else {
+            debugPrint("🔑 All hotkeys re-registered successfully")
+        }
+    }
+    
     /// Restart display memory timer
     private func restartDisplayMemoryTimer() {
-        snapshotTimer?.invalidate()
         let interval = WindowTimingSettings.shared.displayMemoryInterval
-        snapshotTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        timerManager.restartDisplayMemoryTimer(interval: interval) { [weak self] in
             self?.takeWindowSnapshot()
         }
         debugPrint("🔄 Display memory interval changed(\(Int(interval))s interval)")
@@ -1607,12 +1619,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("⏱️ Initial auto-snapshot timer started: \(String(format: "%.1f", delaySeconds/60))min")
         
-        // Cancel existing timer
-        initialSnapshotTimer?.invalidate()
-        initialSnapshotTimer = nil
-        
-        // Add Timer to RunLoop in .common mode (works during UI operations)
-        let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
+        timerManager.scheduleInitialCapture(delay: delaySeconds) { [weak self] in
             debugPrint("⏱️ Initial auto-snapshot timer fired")
             self?.performAutoSnapshot(reason: "Initial auto")
             self?.hasInitialSnapshotBeenTaken = true
@@ -1623,8 +1630,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.startPeriodicSnapshotTimer()
             }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        initialSnapshotTimer = timer
     }
     
     /// Start periodic snapshot timer
@@ -1640,25 +1645,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("⏱️ Periodic snapshot timer started: \(String(format: "%.0f", intervalSeconds/60))min interval")
         
-        // Cancel existing timer
-        periodicSnapshotTimer?.invalidate()
-        periodicSnapshotTimer = nil
-        
-        // Add Timer to RunLoop in .common mode (works during UI operations)
-        let timer = Timer(timeInterval: intervalSeconds, repeats: true) { [weak self] _ in
+        timerManager.startPeriodicCapture(interval: intervalSeconds) { [weak self] in
             debugPrint("⏱️ Periodic snapshot timer fired")
             self?.performAutoSnapshot(reason: "Periodic auto")
         }
-        RunLoop.main.add(timer, forMode: .common)
-        periodicSnapshotTimer = timer
     }
     
     /// Restart periodic snapshot timer (on settings change)
     private func restartPeriodicSnapshotTimerIfNeeded() {
         let settings = SnapshotSettings.shared
         
-        periodicSnapshotTimer?.invalidate()
-        periodicSnapshotTimer = nil
+        timerManager.stopPeriodicCapture()
         
         if settings.enablePeriodicSnapshot && hasInitialSnapshotBeenTaken {
             startPeriodicSnapshotTimer()
@@ -1770,29 +1767,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("⏱️ Post-display-connection snapshot: \(String(format: "%.1f", delaySeconds/60))min scheduled")
         
-        // Cancel existing initial timer and set new one
-        initialSnapshotTimer?.invalidate()
-        initialSnapshotTimer = nil
-        
-        // Add Timer to RunLoop in .common mode (works during UI operations)
-        let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
+        timerManager.scheduleInitialCapture(delay: delaySeconds) { [weak self] in
             debugPrint("⏱️ Post-display-connection snapshot timer fired")
             self?.performAutoSnapshot(reason: "Post-display auto")
             self?.hasInitialSnapshotBeenTaken = true
             
             // Start periodic snapshot if enabled and not yet started
             let snapshotSettings = SnapshotSettings.shared
-            if snapshotSettings.enablePeriodicSnapshot && self?.periodicSnapshotTimer == nil {
+            if snapshotSettings.enablePeriodicSnapshot && !(self?.timerManager.isPeriodicCaptureRunning ?? false) {
                 self?.startPeriodicSnapshotTimer()
             }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        initialSnapshotTimer = timer
     }
     
     
     
     func applicationWillTerminate(_ notification: Notification) {
+        // Stop all timers first
+        timerManager.stopAllTimers()
+        
         // Clear snapshot on termination if privacy protection mode is enabled
         if SnapshotSettings.shared.disablePersistence {
             ManualSnapshotStorage.shared.clear()
@@ -1806,10 +1799,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let handler = eventHandler {
             RemoveEventHandler(handler)
         }
-        // Stop timers
-        snapshotTimer?.invalidate()
-        initialSnapshotTimer?.invalidate()
-        periodicSnapshotTimer?.invalidate()
+        // Stop all timers
+        timerManager.stopAllTimers()
     }
 }
 

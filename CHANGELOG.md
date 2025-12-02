@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - "Open Settings" button for quick access to change modifier keys
   - Helps users identify conflicts with other apps or system shortcuts
 
+### Improved
+- **Restart UX for Settings Changes** (#25)
+  - Hotkey modifier changes now take effect immediately (no restart required)
+  - Language changes still require restart, with clear visual indicator (🔄)
+  - "Restart Now" button appears only when language is changed
+  - Removed confusing static warning text and modal dialog
+
 ### Fixed
 - **Error logging for snapshot operations** (#29)
   - Replaced silent try? with do-catch blocks in ManualSnapshotStorage
@@ -66,6 +73,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Stored in UserDefaults (Keychain is overkill for local-only data)
   - Common app names (Safari, Finder, Chrome) can no longer be identified from stored hashes
 
+### Refactored
+- **Consolidated timer management into TimerManager class** (#28)
+  - Created new `TimerManager.swift` for centralized timer handling
+  - Moved 6 timers from AppDelegate to TimerManager:
+    - displayMemoryTimer (window position recording)
+    - initialCaptureTimer (initial snapshot after launch/connection)
+    - periodicCaptureTimer (periodic auto-snapshot)
+    - stabilizationCheckTimer (display change polling)
+    - restoreWorkItem (window restoration delay)
+    - fallbackWorkItem (post-stabilization fallback)
+  - Added `isCancelled` check for DispatchWorkItem to prevent duplicate execution
+  - Unified Timer creation pattern to `RunLoop.main.add(.common)`
+  - Removed unused `displayStabilizationTimer` variable
+  - Added `stopAllTimers()` call in `applicationWillTerminate` for clean shutdown
+  - Improved debuggability with `activeTimerNames` and `statusDescription` properties
+
 ### Technical Details
 - Implemented NSLocalizedString for all 80+ UI strings
 - Created ja.lproj/Localizable.strings for Japanese translations
@@ -83,6 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modified `registerHotKeys()` to return list of failed registrations
 - Added `unregisterHotKeys()` for cleanup (preparation for #25)
 - Refactored hotkey registration from repetitive code to loop-based implementation
+- Added `HotKeySettings.modifiersDidChangeNotification` for immediate re-registration
+- Added `setupHotkeySettingsObserver()` in AppDelegate for hotkey change detection
+- TimerManager uses singleton pattern consistent with other Settings classes
 
 ### Migration Notes
 - Existing snapshots will not match after upgrade (different hash values)
