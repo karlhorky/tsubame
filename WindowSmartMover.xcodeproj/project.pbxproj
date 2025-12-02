@@ -34,6 +34,7 @@
 				AboutView.swift,
 				AppDelegate.swift,
 				SettingsView.swift,
+				TimerManager.swift,
 				WindowSmartMoverApp.swift,
 			);
 			target = A9B765E02EDACFC700C459F4 /* TsubameTests */;
