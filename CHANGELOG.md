@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - App Store release preparation
 - Binary distribution via GitHub Releases
 
+## [1.2.9] - 2025-12-04
+
+### Changed
+- **Default hotkey modifier** now correctly defaults to `⌃⌘` (Control+Command)
+  - Fixed inconsistency between init() and resetToDefaults()
+  - v1.2.7 changelog stated this change, but init() still had old values
+- **Sound notifications disabled by default**
+  - Previously enabled by default (primarily for debugging)
+  - Users who want sound feedback can enable in Settings → Snapshot
+
+### Fixed
+- Slot index comment typo (1-4 → 1-5)
+
 ## [1.2.8] - 2025-12-02
 
 ### Added

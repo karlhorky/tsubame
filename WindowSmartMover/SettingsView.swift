@@ -201,9 +201,9 @@ class HotKeySettings: ObservableObject {
     private var isInitialized = false
     
     private init() {
-        // Default: Option + Command
-        self.useControl = UserDefaults.standard.object(forKey: "useControl") as? Bool ?? false
-        self.useOption = UserDefaults.standard.object(forKey: "useOption") as? Bool ?? true
+        // Default: Control + Command (changed in v1.2.7)
+        self.useControl = UserDefaults.standard.object(forKey: "useControl") as? Bool ?? true
+        self.useOption = UserDefaults.standard.object(forKey: "useOption") as? Bool ?? false
         self.useShift = UserDefaults.standard.object(forKey: "useShift") as? Bool ?? false
         self.useCommand = UserDefaults.standard.object(forKey: "useCommand") as? Bool ?? true
         // Default: 100 pixels
@@ -522,7 +522,7 @@ class SnapshotSettings: ObservableObject {
         self.periodicSnapshotInterval = defaults.object(forKey: periodicIntervalKey) as? Double ?? 30.0
         self.protectExistingSnapshot = defaults.object(forKey: protectExistingKey) as? Bool ?? true
         self.minimumWindowCount = defaults.object(forKey: minimumWindowCountKey) as? Int ?? 3
-        self.enableSound = defaults.object(forKey: enableSoundKey) as? Bool ?? true
+        self.enableSound = defaults.object(forKey: enableSoundKey) as? Bool ?? false
         self.soundName = defaults.object(forKey: soundNameKey) as? String ?? "Blow"
         self.enableNotification = defaults.object(forKey: enableNotificationKey) as? Bool ?? false
         self.disablePersistence = defaults.object(forKey: disablePersistenceKey) as? Bool ?? false
@@ -614,7 +614,7 @@ class ManualSnapshotStorage {
         }
     }
     
-    /// Get active slot index (1-4 for manual slots)
+    /// Get active slot index (1-5 for manual slots)
     var activeSlotIndex: Int {
         get {
             let saved = defaults.integer(forKey: activeSlotKey)
@@ -1248,7 +1248,7 @@ struct SettingsView: View {
     
     private func resetToDefaults() {
         settings.useControl = true
-        settings.useOption = true
+        settings.useOption = false
         settings.useShift = false
         settings.useCommand = true
         settings.nudgePixels = 100
@@ -1261,7 +1261,7 @@ struct SettingsView: View {
         snapshotSettings.periodicSnapshotInterval = 30.0
         snapshotSettings.protectExistingSnapshot = true
         snapshotSettings.minimumWindowCount = 3
-        snapshotSettings.enableSound = true
+        snapshotSettings.enableSound = false
         snapshotSettings.soundName = "Blow"
         snapshotSettings.enableNotification = false
         snapshotSettings.restoreOnLaunch = false
