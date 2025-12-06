@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./Assets/icon/tsubame_logo.png" width="200" alt="Tsubame Window Smart Mover Logo" />
+</p>
+
 # Tsubame - Window Smart Mover for macOS 
 
 [English](README.md) | [日本語](README_ja.md)
