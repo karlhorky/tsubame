@@ -28,9 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added 5-second cooldown after restore completion to prevent duplicate restoration
   - macOS fires display events immediately after restore, triggering unnecessary second restore
   - Cooldown is bypassed for intentional retries (restore retry mechanism unaffected)
+  - Cooldown resets when screen count increases (ensures restore after display reconnection)
 
 ### Changed
-  - Sleep Behavior settings UI simplified to show only monitoring status (Active/Paused)
+- Sleep Behavior settings UI simplified to show only monitoring status (Active/Paused)
 
 ## [1.2.9] - 2025-12-03
 

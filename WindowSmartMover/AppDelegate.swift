@@ -217,6 +217,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Restore cooldown feature (prevents duplicate restore on rapid display events)
     private var lastRestoreTime: Date?
     private let restoreCooldown: TimeInterval = 5.0
+    private var lastScreenCount: Int = 0
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Set global reference
@@ -299,6 +300,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        
+        // Initialize lastScreenCount for cooldown logic
+        lastScreenCount = NSScreen.screens.count
         
         debugPrint("Application launched")
         debugPrint("Connected screens: \(NSScreen.screens.count)")
@@ -981,6 +985,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let screenCount = NSScreen.screens.count
         debugPrint("🖥️ Display configuration changed")
         debugPrint("Current screen count: \(screenCount)")
+        
+        // Reset cooldown if screen count increased (display reconnected)
+        if screenCount > lastScreenCount {
+            lastRestoreTime = nil
+            debugPrint("🔄 Screen count increased, cooldown reset")
+        }
+        lastScreenCount = screenCount
         
         // If monitoring is disabled
         if !isDisplayMonitoringEnabled {
