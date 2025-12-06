@@ -214,6 +214,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let maxRestoreRetries: Int = 2
     private let restoreRetryDelay: TimeInterval = 3.0
     
+    // Restore cooldown feature (prevents duplicate restore on rapid display events)
+    private var lastRestoreTime: Date?
+    private let restoreCooldown: TimeInterval = 5.0
+    private var lastScreenCount: Int = 0
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Set global reference
         globalAppDelegate = self
@@ -295,6 +300,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        
+        // Initialize lastScreenCount for cooldown logic
+        lastScreenCount = NSScreen.screens.count
         
         debugPrint("Application launched")
         debugPrint("Connected screens: \(NSScreen.screens.count)")
@@ -970,13 +978,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSNotification.Name("DisableDisplayMonitoring"),
             object: nil
         )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(resumeMonitoring),
-            name: NSNotification.Name("ResumeDisplayMonitoring"),
-            object: nil
-        )
     }
     
     /// Handle display configuration change
@@ -984,6 +985,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let screenCount = NSScreen.screens.count
         debugPrint("🖥️ Display configuration changed")
         debugPrint("Current screen count: \(screenCount)")
+        
+        // Reset cooldown if screen count increased (display reconnected)
+        if screenCount > lastScreenCount {
+            lastRestoreTime = nil
+            debugPrint("🔄 Screen count increased, cooldown reset")
+        }
+        lastScreenCount = screenCount
         
         // If monitoring is disabled
         if !isDisplayMonitoringEnabled {
@@ -1050,6 +1058,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Trigger restoration process
     private func triggerRestoration(isRetry: Bool = false) {
+        // Cooldown check (skip for retries)
+        if !isRetry, let lastRestore = lastRestoreTime,
+           Date().timeIntervalSince(lastRestore) < restoreCooldown {
+            debugPrint("⏳ Restore cooldown active, skipping")
+            return
+        }
+        
         // Cancel existing restore task
         timerManager.cancelRestore()
         
@@ -1067,6 +1082,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
             
             let restoredCount = self.restoreWindowsIfNeeded()
+            
+            // Record restore time for cooldown
+            self.lastRestoreTime = Date()
             
             // If restore succeeded and 2+ screens
             if restoredCount > 0 && NSScreen.screens.count >= 2 {
@@ -1098,11 +1116,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("⏸️ Display monitoring paused")
     }
     
-    /// Resume monitoring
-    @objc private func resumeMonitoring() {
-        debugPrint("⏱️ Waiting for display stabilization...")
-    }
-    
     /// Get display identifier
     private func getDisplayIdentifier(for screen: NSScreen) -> String {
         if let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
@@ -1110,11 +1123,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Fallback: use screen frame
         return "\(Int(screen.frame.origin.x))_\(Int(screen.frame.origin.y))_\(Int(screen.frame.width))_\(Int(screen.frame.height))"
-    }
-    
-    /// Create window identifier
-    private func getWindowIdentifier(appName: String, windowID: CGWindowID) -> String {
-        return "\(appName)_\(windowID)"
     }
     
     /// Start periodic monitoring for display memory
