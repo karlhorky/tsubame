@@ -388,6 +388,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(nudgeMenuItem)
         
         menu.addItem(NSMenuItem.separator())
+        // Snapshot operations
         let saveTitle = String(format: NSLocalizedString("📸 Save Layout (%@↑)", comment: "Menu item for saving window layout"), modifierString)
         menu.addItem(NSMenuItem(title: saveTitle, action: #selector(saveManualSnapshot), keyEquivalent: ""))
         
