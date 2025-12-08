@@ -364,6 +364,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
+        // Window nudge submenu
+        let nudgeMenuItem = NSMenuItem(title: NSLocalizedString("🔀 Nudge Window", comment: "Menu item for window nudge"), action: nil, keyEquivalent: "")
+        let nudgeSubmenu = NSMenu()
+        
+        let nudgeUp = NSMenuItem(title: NSLocalizedString("↑ Up", comment: "Nudge window up"), action: #selector(nudgeWindowUp), keyEquivalent: "w")
+        nudgeUp.keyEquivalentModifierMask = [.control, .command]
+        nudgeSubmenu.addItem(nudgeUp)
+        
+        let nudgeDown = NSMenuItem(title: NSLocalizedString("↓ Down", comment: "Nudge window down"), action: #selector(nudgeWindowDown), keyEquivalent: "s")
+        nudgeDown.keyEquivalentModifierMask = [.control, .command]
+        nudgeSubmenu.addItem(nudgeDown)
+        
+        let nudgeLeft = NSMenuItem(title: NSLocalizedString("← Left", comment: "Nudge window left"), action: #selector(nudgeWindowLeft), keyEquivalent: "a")
+        nudgeLeft.keyEquivalentModifierMask = [.control, .command]
+        nudgeSubmenu.addItem(nudgeLeft)
+        
+        let nudgeRight = NSMenuItem(title: NSLocalizedString("→ Right", comment: "Nudge window right"), action: #selector(nudgeWindowRight), keyEquivalent: "d")
+        nudgeRight.keyEquivalentModifierMask = [.control, .command]
+        nudgeSubmenu.addItem(nudgeRight)
+        
+        nudgeMenuItem.submenu = nudgeSubmenu
+        menu.addItem(nudgeMenuItem)
+        
+        menu.addItem(NSMenuItem.separator())
         // Snapshot operations
         let saveTitle = String(format: NSLocalizedString("📸 Save Layout (%@↑)", comment: "Menu item for saving window layout"), modifierString)
         menu.addItem(NSMenuItem(title: saveTitle, action: #selector(saveManualSnapshot), keyEquivalent: ""))
@@ -385,8 +409,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let slotItem = NSMenuItem(
                 title: statusString,
                 action: #selector(selectSlot(_:)),
-                keyEquivalent: ""
+                keyEquivalent: "\(slotIndex)"
             )
+            slotItem.keyEquivalentModifierMask = [.control, .command]
             slotItem.tag = slotIndex
             slotItem.state = isActive ? .on : .off
             slotSubmenu.addItem(slotItem)
@@ -827,6 +852,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 debugPrint("❌ Failed to move window: \(setResult.rawValue)")
             }
         }
+    }
+    
+    // MARK: - Nudge Window Menu Actions
+    
+    @objc func nudgeWindowUp() {
+        nudgeWindow(direction: .up)
+    }
+    
+    @objc func nudgeWindowDown() {
+        nudgeWindow(direction: .down)
+    }
+    
+    @objc func nudgeWindowLeft() {
+        nudgeWindow(direction: .left)
+    }
+    
+    @objc func nudgeWindowRight() {
+        nudgeWindow(direction: .right)
     }
     
     func moveWindow(direction: Direction) {
