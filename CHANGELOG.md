@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - App Store release preparation
 - Binary distribution via GitHub Releases
 
+## v1.2.11 [WIP]
+
+### Added
+- **Menu hotkey display improvements** (#48)
+  - Display `⌃⌘1-5` shortcuts in Slot submenu items
+  - Add "🔀 Nudge Window" submenu with `⌃⌘W/A/S/D` shortcuts
+  - Helps users discover features without reading documentation
+- **Restored Sleep Behavior debug info** (#48)
+  - Re-added "Last sleep" and "Monitoring status" display in Settings
+- **Project branding**
+  - Added app icon and README logo
+
+### Fixed
+- **Auto-snapshot skipped during sleep** (#48)
+  - `isMonitoringEnabled` check now properly guards periodic snapshots
+  - Prevents unnecessary snapshot attempts when display monitoring is paused
+
 ## [1.2.10] - 2025-12-06 
 
 ### Removed
