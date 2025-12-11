@@ -1199,7 +1199,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Take snapshot of current window layout (for auto-restore)
     private func takeWindowSnapshot() {
         // Skip if user is not logged in (e.g., at login screen)
-        // This prevents corrupting displayWindows with login screen display IDs
+        // This prevents corrupting windowPositions with login screen display IDs
         guard isUserLoggedIn() else {
             verbosePrint("📸 Snapshot skipped - user not logged in")
             return
@@ -1630,12 +1630,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let mainScreen = currentScreens[0]
         let mainScreenID = getDisplayIdentifier(for: mainScreen)
         
+        // Select data source: windowPositions (memory) or manualSnapshots[0] (persisted)
+        // Fallback to manualSnapshots[0] if windowPositions is empty (e.g., after app restart)
+        // TODO: Unify these two snapshot mechanisms in future refactoring (see issue #57)
+        let dataSource: [String: [String: WindowMatchInfo]]
+        let dataSourceName: String
+        
+        // Check if windowPositions has valid external display data
+        let windowPosExternalIDs = Set(windowPositions.keys).intersection(currentScreenIDs).subtracting([mainScreenID])
+        let hasWindowPositionsData = !windowPosExternalIDs.isEmpty &&
+            windowPosExternalIDs.contains { windowPositions[$0]?.isEmpty == false }
+        
+        if hasWindowPositionsData {
+            dataSource = windowPositions
+            dataSourceName = "memory"
+        } else {
+            // Fallback to persisted auto-snapshot (Slot 0)
+            dataSource = manualSnapshots[0]
+            dataSourceName = "persisted"
+            if !windowPositions.isEmpty {
+                verbosePrint("  ℹ️ windowPositions has no external display data, falling back to persisted snapshot")
+            } else {
+                verbosePrint("  ℹ️ windowPositions is empty (app restarted?), using persisted snapshot")
+            }
+        }
+        
         // Check which saved screen IDs are currently connected
-        let savedScreenIDs = Set(windowPositions.keys)
+        let savedScreenIDs = Set(dataSource.keys)
         
         // Debug: show display ID comparison
         verbosePrint("  📺 Current display IDs: \(currentScreenIDs.sorted().joined(separator: ", "))")
-        verbosePrint("  💾 Saved display IDs: \(savedScreenIDs.sorted().joined(separator: ", "))")
+        verbosePrint("  💾 Saved display IDs (\(dataSourceName)): \(savedScreenIDs.sorted().joined(separator: ", "))")
         
         // Find invalid display IDs (saved but not currently connected)
         let invalidScreenIDs = savedScreenIDs.subtracting(currentScreenIDs)
@@ -1674,7 +1699,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Process each external display
         for externalScreenID in externalScreenIDs {
-            guard let savedWindows = windowPositions[externalScreenID], !savedWindows.isEmpty else {
+            guard let savedWindows = dataSource[externalScreenID], !savedWindows.isEmpty else {
                 continue
             }
             
