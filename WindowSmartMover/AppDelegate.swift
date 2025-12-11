@@ -2,6 +2,7 @@ import Cocoa
 import Carbon
 import SwiftUI
 import UserNotifications
+import SystemConfiguration
 
 // Global variable to hold AppDelegate reference
 private var globalAppDelegate: AppDelegate?
@@ -1025,6 +1026,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Handle display configuration change
     @objc private func displayConfigurationChanged() {
+        // Skip if user is not logged in (e.g., at login screen)
+        guard isUserLoggedIn() else {
+            verbosePrint("🖥️ Display change ignored - user not logged in")
+            return
+        }
+        
         let screenCount = NSScreen.screens.count
         debugPrint("🖥️ Display configuration changed")
         debugPrint("Current screen count: \(screenCount)")
@@ -1169,6 +1176,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return "\(Int(screen.frame.origin.x))_\(Int(screen.frame.origin.y))_\(Int(screen.frame.width))_\(Int(screen.frame.height))"
     }
     
+    /// Check if user is logged in (not at login screen)
+    /// Returns false when at login screen or when no console user
+    private func isUserLoggedIn() -> Bool {
+        var uid: uid_t = 0
+        guard let userName = SCDynamicStoreCopyConsoleUser(nil, &uid, nil) as String? else {
+            return false
+        }
+        // "loginwindow" means we're at the login screen
+        return !userName.isEmpty && userName != "loginwindow"
+    }
+    
     /// Start periodic monitoring for display memory
     private func startPeriodicSnapshot() {
         let interval = WindowTimingSettings.shared.displayMemoryInterval
@@ -1180,6 +1198,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Take snapshot of current window layout (for auto-restore)
     private func takeWindowSnapshot() {
+        // Skip if user is not logged in (e.g., at login screen)
+        // This prevents corrupting windowPositions with login screen display IDs
+        guard isUserLoggedIn() else {
+            verbosePrint("📸 Snapshot skipped - user not logged in")
+            return
+        }
+        
         let screens = NSScreen.screens
         
         // Check display count - only update snapshot when 2+ screens
@@ -1589,6 +1614,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func restoreWindowsIfNeeded() -> Int {
         debugPrint("🔄 Starting window restore process...")
         
+        // Skip if user is not logged in
+        guard isUserLoggedIn() else {
+            debugPrint("  ⏸️ Skipping restore - user not logged in")
+            return 0
+        }
+        
         let currentScreens = NSScreen.screens
         guard currentScreens.count >= 2 else {
             debugPrint("  Only one screen, skipping restore")
@@ -1599,8 +1630,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let mainScreen = currentScreens[0]
         let mainScreenID = getDisplayIdentifier(for: mainScreen)
         
+        // Select data source: windowPositions (memory) or manualSnapshots[0] (persisted)
+        // Fallback to manualSnapshots[0] if windowPositions is empty (e.g., after app restart)
+        // TODO: Unify these two snapshot mechanisms in future refactoring (see issue #57)
+        let dataSource: [String: [String: WindowMatchInfo]]
+        let dataSourceName: String
+        
+        // Check if windowPositions has valid external display data
+        let windowPosExternalIDs = Set(windowPositions.keys).intersection(currentScreenIDs).subtracting([mainScreenID])
+        let hasWindowPositionsData = !windowPosExternalIDs.isEmpty &&
+            windowPosExternalIDs.contains { windowPositions[$0]?.isEmpty == false }
+        
+        if hasWindowPositionsData {
+            dataSource = windowPositions
+            dataSourceName = "memory"
+        } else {
+            // Fallback to persisted auto-snapshot (Slot 0)
+            dataSource = manualSnapshots[0]
+            dataSourceName = "persisted"
+            if !windowPositions.isEmpty {
+                verbosePrint("  ℹ️ windowPositions has no external display data, falling back to persisted snapshot")
+            } else {
+                verbosePrint("  ℹ️ windowPositions is empty (app restarted?), using persisted snapshot")
+            }
+        }
+        
         // Check which saved screen IDs are currently connected
-        let savedScreenIDs = Set(windowPositions.keys)
+        let savedScreenIDs = Set(dataSource.keys)
+        
+        // Debug: show display ID comparison
+        verbosePrint("  📺 Current display IDs: \(currentScreenIDs.sorted().joined(separator: ", "))")
+        verbosePrint("  💾 Saved display IDs (\(dataSourceName)): \(savedScreenIDs.sorted().joined(separator: ", "))")
+        
+        // Find invalid display IDs (saved but not currently connected)
+        let invalidScreenIDs = savedScreenIDs.subtracting(currentScreenIDs)
+        if !invalidScreenIDs.isEmpty {
+            verbosePrint("  ⚠️ Unknown display IDs (skipping): \(invalidScreenIDs.sorted().joined(separator: ", "))")
+        }
+        
         let externalScreenIDs = savedScreenIDs.intersection(currentScreenIDs).subtracting([mainScreenID])
         
         if externalScreenIDs.isEmpty {
@@ -1608,7 +1675,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return 0
         }
         
-        debugPrint("  Target displays: \(externalScreenIDs.joined(separator: ", "))")
+        debugPrint("  Target displays: \(externalScreenIDs.sorted().joined(separator: ", "))")
         
         // Get current all windows
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
@@ -1632,7 +1699,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Process each external display
         for externalScreenID in externalScreenIDs {
-            guard let savedWindows = windowPositions[externalScreenID], !savedWindows.isEmpty else {
+            guard let savedWindows = dataSource[externalScreenID], !savedWindows.isEmpty else {
                 continue
             }
             
@@ -1699,69 +1766,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     // Find matching window from all windows
                     var matchFound = false
                     for axWindow in windows {
-                        var isMatch = false
-                        
-                        if isCGWindowIDMatch {
-                            // CGWindowID exact match: use size matching (more stable after wake)
-                            // Position can diverge between CGWindowList and AXUIElement after long sleep
-                            var axSizeRef: CFTypeRef?
-                            if AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &axSizeRef) == .success,
-                               let axSizeValue = axSizeRef {
-                                var axSize = CGSize.zero
-                                if AXValueGetValue(axSizeValue as! AXValue, .cgSize, &axSize) {
-                                    // Size tolerance: 10px (size is more stable than position)
-                                    if abs(axSize.width - currentFrame.width) < 10 &&
-                                       abs(axSize.height - currentFrame.height) < 10 {
-                                        isMatch = true
+                        var currentPosRef: CFTypeRef?
+                        if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
+                           let currentPosValue = currentPosRef {
+                            var currentPoint = CGPoint.zero
+                            // CoreFoundation type cast always succeeds after API success
+                            if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
+                                // Check if current position matches current window position
+                                if abs(currentPoint.x - currentFrame.origin.x) < 50 &&
+                                   abs(currentPoint.y - currentFrame.origin.y) < 50 {
+                                    // Move to saved coordinates
+                                    var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
+                                    if let positionValue = AXValueCreate(.cgPoint, &position) {
+                                        let posResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
+                                        
+                                        // Also restore size
+                                        var size = CGSize(width: savedFrame.width, height: savedFrame.height)
+                                        var sizeRestored = false
+                                        if let sizeValue = AXValueCreate(.cgSize, &size) {
+                                            let sizeResult = AXUIElementSetAttributeValue(axWindow, kAXSizeAttribute as CFString, sizeValue)
+                                            sizeRestored = (sizeResult == .success)
+                                        }
+                                        
+                                        if posResult == .success {
+                                            restoredCount += 1
+                                            let sizeInfo = sizeRestored ? "+size" : ""
+                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) restored to (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y)))\(sizeInfo)")
+                                        } else {
+                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) move failed: \(posResult.rawValue)")
+                                        }
                                     }
+                                    matchFound = true
+                                    break
                                 }
                             }
-                        } else {
-                            // Fallback: position matching for non-CGWindowID cases
-                            var currentPosRef: CFTypeRef?
-                            if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
-                               let currentPosValue = currentPosRef {
-                                var currentPoint = CGPoint.zero
-                                if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
-                                    // Position tolerance: 50px
-                                    if abs(currentPoint.x - currentFrame.origin.x) < 50 &&
-                                       abs(currentPoint.y - currentFrame.origin.y) < 50 {
-                                        isMatch = true
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if isMatch {
-                            // Move to saved coordinates
-                            var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
-                            if let positionValue = AXValueCreate(.cgPoint, &position) {
-                                let posResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
-                                
-                                // Also restore size
-                                var size = CGSize(width: savedFrame.width, height: savedFrame.height)
-                                var sizeRestored = false
-                                if let sizeValue = AXValueCreate(.cgSize, &size) {
-                                    let sizeResult = AXUIElementSetAttributeValue(axWindow, kAXSizeAttribute as CFString, sizeValue)
-                                    sizeRestored = (sizeResult == .success)
-                                }
-                                
-                                if posResult == .success {
-                                    restoredCount += 1
-                                    let sizeInfo = sizeRestored ? "+size" : ""
-                                    let matchType = isCGWindowIDMatch ? "size" : "pos"
-                                    debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) restored to (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y)))\(sizeInfo) [\(matchType)]")
-                                } else {
-                                    debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) move failed: \(posResult.rawValue)")
-                                }
-                            }
-                            matchFound = true
-                            break
                         }
                     }
                     if !matchFound {
-                        let matchType = isCGWindowIDMatch ? "size" : "position"
-                        verbosePrint("      ⚠️ AXUIElement \(matchType) match failed - CGWindow pos: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y))), size: \(Int(currentFrame.width))x\(Int(currentFrame.height))")
+                        verbosePrint("      ⚠️ AXUIElement position match failed - CGWindow pos: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
                     }
                 }
             }

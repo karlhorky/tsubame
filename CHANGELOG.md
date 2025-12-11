@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned: v1.3.0 (Stable Release)
 - Stability improvements and bug fixes based on v1.2.x feedback
+- Unify `windowPositions` and `manualSnapshots` mechanisms (#57)
 - Documentation finalization
 
 ### Planned: Future
@@ -34,6 +35,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-snapshot skipped during sleep** (#48)
   - `isMonitoringEnabled` check now properly guards periodic snapshots
   - Prevents unnecessary snapshot attempts when display monitoring is paused
+- **AXUIElement position mismatch after long sleep** (#50)
+  - Window restoration failed when CGWindowID matched but position coordinates diverged
+  - Changed to size-based matching (10px tolerance) when CGWindowID exact match succeeds
+  - Position matching remains as fallback for non-CGWindowID cases
+- **Monitoring flag not restored on wake** (#54)
+  - `WindowTimingSettings.isMonitoringEnabled` was set false on sleep but never restored
+  - Added restoration in `checkStabilization()` alongside `isDisplayMonitoringEnabled`
+  - Prevents permanent "snapshot skipped (monitoring disabled)" state
+- **Phantom display IDs at login screen** (#56)
+  - Added `isUserLoggedIn()` check using `SCDynamicStoreCopyConsoleUser`
+  - Guards `displayConfigurationChanged()`, `takeWindowSnapshot()`, and `restoreWindowsIfNeeded()`
+  - Prevents data corruption from login screen display IDs
+- **Window restore fails after app restart during sleep** (#56)
+  - `windowPositions` (memory-only) was lost on app restart
+  - Added fallback to `manualSnapshots[0]` (persisted) when `windowPositions` is empty
+  - Verbose logging shows data source: "memory" or "persisted"
 
 ## [1.2.10] - 2025-12-06 
 
