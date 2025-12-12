@@ -200,8 +200,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Auto snapshot feature
     private var hasInitialSnapshotBeenTaken = false
     
-    // Display monitoring enabled/disabled state
-    private var isDisplayMonitoringEnabled = true
+    // Monitoring enabled/disabled state (unified flag for system sleep, display sleep)
+    private var isMonitoringEnabled = true
     
     // Last display change time (for stabilization detection)
     private var lastDisplayChangeTime: Date?
@@ -1067,7 +1067,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         lastScreenCount = screenCount
         
         // If monitoring is disabled
-        if !isDisplayMonitoringEnabled {
+        if !isMonitoringEnabled {
             // Keep recording events (this is important!)
             lastDisplayChangeTime = Date()
             
@@ -1103,7 +1103,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // True stabilization achieved
             timerManager.stopStabilizationCheck()
             
-            isDisplayMonitoringEnabled = true
+            isMonitoringEnabled = true
             eventOccurredAfterStabilization = false
             
             debugPrint("✅ Display stabilized (\(String(format: "%.1f", elapsed))s since last event)")
@@ -1181,7 +1181,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Pause monitoring
     @objc private func pauseMonitoring() {
-        isDisplayMonitoringEnabled = false
+        isMonitoringEnabled = false
         lastDisplayChangeTime = nil
         timerManager.stopStabilizationCheck()
         timerManager.cancelFallback()
@@ -1202,7 +1202,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("☀️ System woke from sleep")
         // Note: Monitoring resume is handled by display stabilization logic
         // (displayConfigurationChanged → checkStabilization)
-        // Do not set isDisplayMonitoringEnabled = true here
+        // Do not set isMonitoringEnabled = true here
     }
     
     /// Handle display sleep (separate from system sleep)
@@ -1214,7 +1214,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Handle display wake (separate from system wake)
     @objc private func handleScreensDidWake() {
         debugPrint("☀️ Display woke up")
-        isDisplayMonitoringEnabled = true
+        isMonitoringEnabled = true
         debugPrint("▶️ Monitoring resumed after display wake")
     }
     
@@ -1239,7 +1239,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Take snapshot of current window layout (for auto-restore)
     private func takeWindowSnapshot() {
         // Skip if monitoring is paused (display sleep, system sleep, etc.)
-        guard isDisplayMonitoringEnabled else {
+        guard isMonitoringEnabled else {
             return
         }
         
