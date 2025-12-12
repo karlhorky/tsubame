@@ -2,6 +2,7 @@ import Cocoa
 import Carbon
 import SwiftUI
 import UserNotifications
+import SystemConfiguration
 
 // Global variable to hold AppDelegate reference
 private var globalAppDelegate: AppDelegate?
@@ -181,14 +182,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var aboutWindow: NSWindow?
     var debugWindow: NSWindow?
     
-    // Display memory feature (new format: using WindowMatchInfo)
-    private var windowPositions: [String: [String: WindowMatchInfo]] = [:]
-    
     // Timer management (delegated to TimerManager)
     private let timerManager = TimerManager.shared
     
-    // Manual snapshot feature (6 slots: Slot 0 = auto, Slot 1-5 = manual)
-    // New format: using WindowMatchInfo (hashed for privacy protection)
+    // Snapshot storage (6 slots)
+    // Slot 0: Auto-snapshot for display memory (updated every 30s, persisted every 30min)
+    // Slot 1-5: Manual snapshots (user-triggered)
+    // Format: [displayID: [windowKey: WindowMatchInfo]]
     private var manualSnapshots: [[String: [String: WindowMatchInfo]]] = Array(repeating: [:], count: 6)
     
     // Current slot index for manual operations (1-5, Slot 0 is reserved for auto-snapshot)
@@ -1047,6 +1047,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Handle display configuration change
     @objc private func displayConfigurationChanged() {
+        // Skip processing when user not logged in (login screen has phantom display IDs)
+        guard isUserLoggedIn() else {
+            debugPrint("🖥️ Display change ignored - user not logged in")
+            return
+        }
+        
         let screenCount = NSScreen.screens.count
         debugPrint("🖥️ Display configuration changed")
         debugPrint("Current screen count: \(screenCount)")
@@ -1181,6 +1187,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("⏸️ Display monitoring paused")
     }
     
+    /// Check if user is logged in (not at login screen)
+    /// Returns false when at login screen where display IDs may be phantom
+    private func isUserLoggedIn() -> Bool {
+        var uid: uid_t = 0
+        guard let userName = SCDynamicStoreCopyConsoleUser(nil, &uid, nil) as String?,
+              !userName.isEmpty,
+              userName != "loginwindow" else {
+            return false
+        }
+        return true
+    }
+    
     /// Handle system sleep
     @objc private func handleSystemSleep() {
         debugPrint("💤 System going to sleep")
@@ -1229,9 +1247,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     /// Take snapshot of current window layout (for auto-restore)
+    /// Note: Writes to manualSnapshots[0] (Slot 0 = auto-snapshot slot)
+    /// This is memory-only update; persistence happens in performAutoSnapshot() every 30min
     private func takeWindowSnapshot() {
         // Skip if monitoring is paused (display sleep, system sleep, etc.)
         guard isMonitoringEnabled else {
+            return
+        }
+        
+        // Skip when user not logged in (login screen has phantom display IDs)
+        guard isUserLoggedIn() else {
+            verbosePrint("📸 Snapshot skipped - user not logged in")
             return
         }
         
@@ -1248,20 +1274,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        // Backup external display data temporarily
+        // Backup external display data temporarily (from Slot 0)
         let mainScreenID = getDisplayIdentifier(for: screens[0])
         var externalDisplayBackup: [String: [String: WindowMatchInfo]] = [:]
-        for (displayID, windows) in windowPositions {
+        for (displayID, windows) in manualSnapshots[0] {
             if displayID != mainScreenID && !windows.isEmpty {
                 externalDisplayBackup[displayID] = windows
             }
         }
         
-        // Clear old data and initialize per screen
-        windowPositions.removeAll()
+        // Clear old data and initialize per screen (Slot 0)
+        manualSnapshots[0].removeAll()
         for screen in screens {
             let displayID = getDisplayIdentifier(for: screen)
-            windowPositions[displayID] = [:]
+            manualSnapshots[0][displayID] = [:]
         }
         
         // Record all windows (WindowMatchInfo format)
@@ -1299,7 +1325,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             for screen in screens {
                 if screen.frame.intersects(frame) {
                     let displayID = getDisplayIdentifier(for: screen)
-                    windowPositions[displayID]?[windowKey] = matchInfo
+                    manualSnapshots[0][displayID]?[windowKey] = matchInfo
                     windowCountPerDisplay[displayID, default: 0] += 1
                     break
                 }
@@ -1313,8 +1339,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 continue
             }
             // Restore from backup if no current data
-            if windowPositions[displayID] != nil {
-                windowPositions[displayID] = backupWindows
+            if manualSnapshots[0][displayID] != nil {
+                manualSnapshots[0][displayID] = backupWindows
                 verbosePrint("🔄 Restoring backup for external display \(displayID): \(backupWindows.count) windows")
             }
         }
@@ -1644,6 +1670,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func restoreWindowsIfNeeded() -> Int {
         debugPrint("🔄 Starting window restore process...")
         
+        // Skip when user not logged in (login screen has phantom display IDs)
+        guard isUserLoggedIn() else {
+            debugPrint("  ⏸️ Skipping restore - user not logged in")
+            return 0
+        }
+        
         let currentScreens = NSScreen.screens
         guard currentScreens.count >= 2 else {
             debugPrint("  Only one screen, skipping restore")
@@ -1654,8 +1686,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let mainScreen = currentScreens[0]
         let mainScreenID = getDisplayIdentifier(for: mainScreen)
         
-        // Check which saved screen IDs are currently connected
-        let savedScreenIDs = Set(windowPositions.keys)
+        // Check which saved screen IDs are currently connected (from Slot 0)
+        let savedScreenIDs = Set(manualSnapshots[0].keys)
         let externalScreenIDs = savedScreenIDs.intersection(currentScreenIDs).subtracting([mainScreenID])
         
         if externalScreenIDs.isEmpty {
@@ -1687,7 +1719,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Process each external display
         for externalScreenID in externalScreenIDs {
-            guard let savedWindows = windowPositions[externalScreenID], !savedWindows.isEmpty else {
+            guard let savedWindows = manualSnapshots[0][externalScreenID], !savedWindows.isEmpty else {
                 continue
             }
             
