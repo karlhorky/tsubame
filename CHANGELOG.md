@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned: Future
 - App Store release (requires separate investigation - see #49)
 
-## v1.2.11 [WIP]
+## v1.2.11 - 2025-1212
 
 ### Added
 - **Launch at Login option** (#42)
