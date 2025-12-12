@@ -214,6 +214,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let maxRestoreRetries: Int = 2
     private let restoreRetryDelay: TimeInterval = 3.0
     
+    // Fallback restoration feature (triggers if no display event after stabilization)
+    private let fallbackWaitDelay: TimeInterval = 3.0
+    
     // Restore cooldown feature (prevents duplicate restore on rapid display events)
     private var lastRestoreTime: Date?
     private let restoreCooldown: TimeInterval = 5.0
@@ -1106,10 +1109,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             debugPrint("✅ Display stabilized (\(String(format: "%.1f", elapsed))s since last event)")
             debugPrint("▶️ Resuming monitoring after display stabilization")
-            debugPrint("⏳ Waiting for next display event (max 3s)")
+            debugPrint("⏳ Waiting for next display event (max \(Int(fallbackWaitDelay))s)")
             
-            // Setup fallback (after 3 seconds)
-            timerManager.scheduleFallback(delay: 3.0) { [weak self] in
+            // Setup fallback (after fallbackWaitDelay seconds)
+            timerManager.scheduleFallback(delay: fallbackWaitDelay) { [weak self] in
                 self?.fallbackRestoration()
             }
         }
@@ -1177,8 +1180,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    /// Pause monitoring
+    /// Pause monitoring (idempotent - safe to call multiple times)
     @objc private func pauseMonitoring() {
+        guard isMonitoringEnabled else { return }  // Already paused
         isMonitoringEnabled = false
         lastDisplayChangeTime = nil
         timerManager.stopStabilizationCheck()
@@ -1199,9 +1203,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
     
+    // MARK: - Sleep/Wake Handlers
+    // 
+    // Sleep monitoring behavior:
+    // - System sleep: Controlled by disableMonitoringDuringSleep setting
+    //   (default: true = pause monitoring during sleep)
+    // - Display sleep: Always pause monitoring to prevent phantom display ID issues
+    //
+    // Wake resume behavior:
+    // - System wake: Do NOT resume immediately (wait for display stabilization)
+    // - Display wake: Resume monitoring, then wait for display configuration events
+    
     /// Handle system sleep
     @objc private func handleSystemSleep() {
         debugPrint("💤 System going to sleep")
+        // Controlled by user setting (default: true)
         if WindowTimingSettings.shared.disableMonitoringDuringSleep {
             pauseMonitoring()
         }
@@ -1218,6 +1234,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Handle display sleep (separate from system sleep)
     @objc private func handleScreensDidSleep() {
         debugPrint("💤 Display going to sleep")
+        // Always pause to prevent snapshot corruption from phantom display IDs
         pauseMonitoring()
     }
     
