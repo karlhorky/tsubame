@@ -1015,10 +1015,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Setup monitoring pause/resume notifications
     private func setupMonitoringControlObservers() {
+        // Legacy notification (will be removed in Phase 2 Step 5)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(pauseMonitoring),
             name: NSNotification.Name("DisableDisplayMonitoring"),
+            object: nil
+        )
+        
+        // System sleep/wake notifications
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleSystemSleep),
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleSystemWake),
+            name: NSWorkspace.didWakeNotification,
             object: nil
         )
         
@@ -1172,6 +1187,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         timerManager.cancelFallback()
         eventOccurredAfterStabilization = false
         debugPrint("⏸️ Display monitoring paused")
+    }
+    
+    /// Handle system sleep
+    @objc private func handleSystemSleep() {
+        debugPrint("💤 System going to sleep")
+        if WindowTimingSettings.shared.disableMonitoringDuringSleep {
+            pauseMonitoring()
+        }
+    }
+    
+    /// Handle system wake
+    @objc private func handleSystemWake() {
+        debugPrint("☀️ System woke from sleep")
+        // Note: Monitoring resume is handled by display stabilization logic
+        // (displayConfigurationChanged → checkStabilization)
+        // Do not set isDisplayMonitoringEnabled = true here
     }
     
     /// Handle display sleep (separate from system sleep)
