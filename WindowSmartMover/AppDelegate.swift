@@ -1015,14 +1015,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Setup monitoring pause/resume notifications
     private func setupMonitoringControlObservers() {
-        // Legacy notification (will be removed in Phase 2 Step 5)
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(pauseMonitoring),
-            name: NSNotification.Name("DisableDisplayMonitoring"),
-            object: nil
-        )
-        
         // System sleep/wake notifications
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
