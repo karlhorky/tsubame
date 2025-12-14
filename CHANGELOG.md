@@ -9,17 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned: v1.3.0 (Stable Release)
 - Stability improvements and bug fixes based on v1.2.x feedback
-- Unify `windowPositions` and `manualSnapshots` mechanisms (#57)
 - Documentation finalization
 
 ### Planned: Future
 - App Store release (requires separate investigation - see #49)
 
-### Planned: v1.2.13
-- #47 Phase 2-4: Monitoring flag unification, snapshot data unification, code cleanup
+## [1.2.13] - 2025-12-14
 
+### Changed
+- **Architecture refactoring** (#47 Phase 2-4)
+  - Unified monitoring flag management (single source of truth)
+  - Unified snapshot data to manualSnapshots[0] (fixes data loss on app restart)
+  - Made pauseMonitoring() idempotent (fixes duplicate log on sleep)
+  - Extracted timing constants for maintainability
 
-## v1.2.12 - 2025-1212 
+### Added
+- **Project documentation**
+  - ARCHITECTURE.md: Technical structure and data flow
+  - PROJECT.md: Entry point for developers and systems
+
+### Fixed
+- **AXUIElement position mismatch after long sleep** (#50)
+  - Window restoration failed when CGWindowID matched but position coordinates diverged
+  - Changed to size-based matching (10px tolerance) when CGWindowID exact match succeeds
+  - Position matching remains as fallback for non-CGWindowID cases
+- **Monitoring flag not restored on wake** (#54)
+  - `WindowTimingSettings.isMonitoringEnabled` was set false on sleep but never restored
+  - Added restoration in `checkStabilization()` alongside `isDisplayMonitoringEnabled`
+  - Prevents permanent "snapshot skipped (monitoring disabled)" state
+- **Phantom display IDs at login screen** (#56)
+  - Added `isUserLoggedIn()` check using `SCDynamicStoreCopyConsoleUser`
+  - Guards `displayConfigurationChanged()`, `takeWindowSnapshot()`, and `restoreWindowsIfNeeded()`
+  - Prevents data corruption from login screen display IDs
+- **Window restore fails after app restart during sleep** (#56)
+  - `windowPositions` (memory-only) was lost on app restart
+  - Phase 3 unified data to `manualSnapshots[0]` (persisted), eliminating this issue
+
+## [1.2.12] - 2025-12-12 
 
 ### Added
 - **Display sleep/wake handling** (#47 Phase 1)
@@ -32,8 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `isDisplayMonitoringEnabled` guard to `takeWindowSnapshot()`
   - Prevents repeated "Restoring backup" when display is off but system is running
 
+### Changed
+- disableMonitoringDuringSleep now defaults to true
+  - Recommended for most users to prevent sleep-related issues
 
-## [1.2.11] - 2025-1212
+## [1.2.11] - 2025-12-10
 
 ### Added
 - **Launch at Login option** (#42)
@@ -53,22 +82,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-snapshot skipped during sleep** (#48)
   - `isMonitoringEnabled` check now properly guards periodic snapshots
   - Prevents unnecessary snapshot attempts when display monitoring is paused
-- **AXUIElement position mismatch after long sleep** (#50)
-  - Window restoration failed when CGWindowID matched but position coordinates diverged
-  - Changed to size-based matching (10px tolerance) when CGWindowID exact match succeeds
-  - Position matching remains as fallback for non-CGWindowID cases
-- **Monitoring flag not restored on wake** (#54)
-  - `WindowTimingSettings.isMonitoringEnabled` was set false on sleep but never restored
-  - Added restoration in `checkStabilization()` alongside `isDisplayMonitoringEnabled`
-  - Prevents permanent "snapshot skipped (monitoring disabled)" state
-- **Phantom display IDs at login screen** (#56)
-  - Added `isUserLoggedIn()` check using `SCDynamicStoreCopyConsoleUser`
-  - Guards `displayConfigurationChanged()`, `takeWindowSnapshot()`, and `restoreWindowsIfNeeded()`
-  - Prevents data corruption from login screen display IDs
-- **Window restore fails after app restart during sleep** (#56)
-  - `windowPositions` (memory-only) was lost on app restart
-  - Added fallback to `manualSnapshots[0]` (persisted) when `windowPositions` is empty
-  - Verbose logging shows data source: "memory" or "persisted"
 
 ## [1.2.10] - 2025-12-06 
 
