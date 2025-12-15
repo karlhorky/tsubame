@@ -1192,11 +1192,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Check if user is logged in (not at login screen)
     /// Returns false when at login screen where display IDs may be phantom
+    /// See: https://github.com/zembutsu/Tsubame/issues/66
     private func isUserLoggedIn() -> Bool {
         var uid: uid_t = 0
-        guard let userName = SCDynamicStoreCopyConsoleUser(nil, &uid, nil) as String?,
-              !userName.isEmpty,
-              userName != "loginwindow" else {
+        let userName = SCDynamicStoreCopyConsoleUser(nil, &uid, nil) as String?
+        let isLoggedIn = userName != nil && !userName!.isEmpty && userName != "loginwindow"
+        verbosePrint("🔐 Login check: user=\(userName ?? "nil"), uid=\(uid), result=\(isLoggedIn)")
+        if !isLoggedIn {
             return false
         }
         return true
