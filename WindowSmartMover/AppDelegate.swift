@@ -69,14 +69,13 @@ class DebugLogger {
     private var appCounter = 0
     
     func addLog(_ message: String) {
-        let timestamp: String
+        let formatter = DateFormatter()
         if SnapshotSettings.shared.showMilliseconds {
-            let formatter = DateFormatter()
             formatter.dateFormat = "HH:mm:ss.SSS"
-            timestamp = formatter.string(from: Date())
         } else {
-            timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+            formatter.dateFormat = "HH:mm:ss"
         }
+        let timestamp = formatter.string(from: Date())
         let logEntry = "[\(timestamp)] \(message)"
         logs.append(logEntry)
         
@@ -1193,6 +1192,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Check if user is logged in (not at login screen)
     /// Returns false when at login screen where display IDs may be phantom
+    /// See: https://github.com/zembutsu/Tsubame/issues/66
     private func isUserLoggedIn() -> Bool {
         var uid: uid_t = 0
         guard let userName = SCDynamicStoreCopyConsoleUser(nil, &uid, nil) as String?,
@@ -1358,7 +1358,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Restore from backup if no current data
             if manualSnapshots[0][displayID] != nil {
                 manualSnapshots[0][displayID] = backupWindows
-                verbosePrint("🔄 Restoring backup for external display \(displayID): \(backupWindows.count) windows")
+                verbosePrint("🔄 [Auto] Restoring backup for external display \(displayID): \(backupWindows.count) windows")
             }
         }
     }
@@ -1448,7 +1448,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Restore manual snapshot
     @objc func restoreManualSnapshot() {
-        debugPrint("📥 Starting manual snapshot restore (slot \(currentSlotIndex))")
+        let modifierString = HotKeySettings.shared.getModifierString()
+        debugPrint("📥 [Manual: \(modifierString)↓] Starting manual snapshot restore (slot \(currentSlotIndex))")
         
         let snapshot = manualSnapshots[currentSlotIndex]
         
@@ -1684,11 +1685,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Restore windows and return the number of restored windows
     @discardableResult // Suppress warning when return value is unused
-    private func restoreWindowsIfNeeded() -> Int {
-        debugPrint("🔄 Starting window restore process...")
+    private func restoreWindowsIfNeeded(trigger: String = "Auto") -> Int {
+        debugPrint("🔄 [\(trigger)] Starting window restore process...")
         
         // Skip when user not logged in (login screen has phantom display IDs)
-        guard isUserLoggedIn() else {
+        let loggedIn = isUserLoggedIn()
+        verbosePrint("🔐 Login check: result=\(loggedIn)")
+        guard loggedIn else {
             debugPrint("  ⏸️ Skipping restore - user not logged in")
             return 0
         }
@@ -1840,7 +1843,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         }
                     }
                     if !matchFound {
-                        verbosePrint("      ⚠️ AXUIElement position match failed - CGWindow pos: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
+                        verbosePrint("      ⚠️ AXUIElement position match failed - expected: (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))), actual: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
                     }
                 }
             }
@@ -2097,7 +2100,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Persist
         ManualSnapshotStorage.shared.save(manualSnapshots)
         
-        debugPrint("📸 \(reason)snapshot complete: \(savedCount) windows")
+        debugPrint("📸 \(reason)snapshot complete: \(savedCount) windows (\(screens.count) screens)")
         
         // Notification (auto snapshot: sound only, no system notification)
         if SnapshotSettings.shared.enableSound {
