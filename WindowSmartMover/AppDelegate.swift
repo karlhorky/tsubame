@@ -301,6 +301,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup pause state observer
         setupPauseStateObserver()
         
+        // Initialize Focus Follows Mouse manager (don't start yet)
+        _ = FocusFollowsMouseManager.shared
+        
         // Start periodic snapshot for display memory
         startPeriodicSnapshot()
         
@@ -329,6 +332,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("Application launched")
         debugPrint("Connected screens: \(NSScreen.screens.count)")
         debugPrint("Pause state: \(PauseManager.shared.isPaused ? "PAUSED" : "active")")
+        debugPrint("Focus Follows Mouse: \(FocusFollowsMouseManager.shared.isEnabled ? "ON" : "OFF")")
+        
+        // Start Focus Follows Mouse after all initialization is complete
+        FocusFollowsMouseManager.shared.startIfEnabled()
     }
     
     /// Setup notification center
@@ -1189,6 +1196,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
+        // Suspend Focus Follows Mouse during display changes
+        FocusFollowsMouseManager.shared.suspendForDisplayChange()
+        
         let screenCount = NSScreen.screens.count
         debugPrint("🖥️ Display configuration changed")
         debugPrint("Current screen count: \(screenCount)")
@@ -1269,6 +1279,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !isRetry, let lastRestore = lastRestoreTime,
            Date().timeIntervalSince(lastRestore) < restoreCooldown {
             debugPrint("⏳ Restore cooldown active, skipping")
+            // Resume Focus Follows Mouse even when skipping
+            FocusFollowsMouseManager.shared.resumeAfterDisplayChange()
             return
         }
         
@@ -1292,6 +1304,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Record restore time for cooldown
             self.lastRestoreTime = Date()
+            
+            // Resume Focus Follows Mouse after restore completes
+            FocusFollowsMouseManager.shared.resumeAfterDisplayChange()
             
             // If restore succeeded and 2+ screens
             if restoredCount > 0 && NSScreen.screens.count >= 2 {
