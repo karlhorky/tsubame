@@ -171,6 +171,22 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
 
 > 💡 **Use Case**: When you manually switch your external display's input source (e.g., between Mac and PC), macOS detects this as a disconnect/reconnect event. Without Pause, Tsubame would trigger window restoration combined with macOS's own window relocation, causing chaotic movement. Pause lets you temporarily disable all Tsubame functions during such intentional switching.
 
+### Focus Follows Mouse (v1.4.0+)
+- **X11-Style Auto-Focus**: Windows automatically receive focus when the mouse hovers over them
+  - No clicking required to switch between windows
+  - Familiar behavior for X11/Linux users
+- **Configurable Hover Delay**:
+  - Instant (0ms): Immediate focus change
+  - Fast (150ms): Quick response with minimal accidental triggers
+  - Standard (250ms): Balanced default setting
+  - Slow (500ms): Conservative, prevents accidental focus changes
+  - Custom: Fine-tune from 0-1000ms
+- **Event-Driven Architecture**: Uses `NSEvent.addGlobalMonitorForEvents` - no polling, zero battery impact
+- **Respects Pause State**: Automatically disabled when Tsubame is paused
+- **System Process Exclusion**: Menu bar and Dock areas are automatically excluded
+
+> 💡 **Use Case**: Power users who work with multiple windows and prefer keyboard-centric workflows. Instead of clicking to switch focus, just move your mouse over the target window. Combined with Window Nudge (⌃⌘WASD), you can manage window positions and focus entirely from the keyboard.
+
 ### Coming Soon 🚧
 
 ⚠️ **Note**: These features are under active development.
@@ -423,6 +439,10 @@ No sensitive information is logged or transmitted.
 ### Planned (v1.3.0 - Stable Release)
 - [ ] Stability improvements based on v1.2.x feedback
 - [ ] Documentation finalization
+
+### Planned (v1.4.0 - Focus Follows Mouse)
+- [x] Focus Follows Mouse feature (#72)
+- [ ] Additional focus behavior options based on feedback
 
 ### Future Considerations
 - [ ] **App Store release** (#49) - Requires Sandbox/Accessibility API investigation

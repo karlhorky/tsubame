@@ -947,6 +947,7 @@ struct SettingsView: View {
     @ObservedObject var snapshotSettings = SnapshotSettings.shared
     @ObservedObject var languageSettings = LanguageSettings.shared
     @ObservedObject var pauseManager = PauseManager.shared
+    @ObservedObject var focusManager = FocusFollowsMouseManager.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedTab = 0
     @State private var languageChanged = false
@@ -1127,6 +1128,53 @@ struct SettingsView: View {
                                     .fontWeight(.semibold)
                                     .frame(width: 55, alignment: .trailing)
                             }
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            
+            // Focus Behavior
+            GroupBox(label: Text(NSLocalizedString("Focus Behavior", comment: "")).font(.headline)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Toggle(NSLocalizedString("Focus follows mouse", comment: ""), isOn: $focusManager.isEnabled)
+                        Spacer()
+                    }
+                    
+                    Text(NSLocalizedString("Automatically focus and raise windows when mouse hovers over them", comment: ""))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if focusManager.isEnabled {
+                        Divider()
+                        
+                        // Delay preset
+                        HStack {
+                            Text(NSLocalizedString("Delay:", comment: ""))
+                                .font(.subheadline)
+                            Picker("", selection: $focusManager.selectedPreset) {
+                                ForEach(FocusDelayPreset.allCases, id: \.self) { preset in
+                                    Text(preset.displayName).tag(preset)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .disabled(focusManager.useCustomDelay)
+                            Spacer()
+                        }
+                        
+                        // Custom delay
+                        HStack {
+                            Toggle(NSLocalizedString("Custom:", comment: ""), isOn: $focusManager.useCustomDelay)
+                            if focusManager.useCustomDelay {
+                                Stepper(value: $focusManager.customDelayMs, in: 0...1000, step: 50) {
+                                    Text("\(focusManager.customDelayMs) ms")
+                                        .foregroundColor(.blue)
+                                        .fontWeight(.semibold)
+                                        .frame(width: 70, alignment: .trailing)
+                                }
+                            }
+                            Spacer()
                         }
                     }
                 }
@@ -1436,6 +1484,10 @@ struct SettingsView: View {
         snapshotSettings.maskAppNamesInLog = true
         pauseManager.resumeOnRelaunch = true
         pauseManager.resumeOnWake = false
+        focusManager.isEnabled = false
+        focusManager.selectedPreset = .standard
+        focusManager.useCustomDelay = false
+        focusManager.customDelayMs = 250
     }
     
     private func formatMinutes(_ minutes: Double) -> String {

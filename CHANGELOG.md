@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned: v1.4.0 (Focus Follows Mouse)
+- Focus Follows Mouse feature (#72)
+  - X11-style auto-focus when mouse hovers over windows
+  - Configurable delay: Instant (0ms) / Fast (150ms) / Standard (250ms) / Slow (500ms) / Custom
+  - Event-driven via NSEvent.addGlobalMonitorForEvents (no battery impact)
+  - Respects Pause state
+  - System process exclusion (menu bar, Dock)
+  - Default: disabled
+
 ### Planned: v1.3.0 (Stable Release)
 - Stability improvements and bug fixes based on v1.2.x feedback
 - Documentation finalization
