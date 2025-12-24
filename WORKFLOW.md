@@ -1,6 +1,6 @@
 # WORKFLOW.md - Bebop Style Development Session Guide
 
-> Version: 0.2.0 (S003で策定)
+> Version: 0.2.1 (S004で更新)
 > Purpose: 人間とAIのセッション開始/終了手順を明確化
 
 ---
@@ -49,6 +49,12 @@
 ### For AI (Claude)
 
 ```markdown
+□ 0. ファイル添付確認（最初に実行）
+     - WORKFLOW.md がなければ「ローカルのWORKFLOW.mdをアップロードしてください」と指示
+     - ARCHITECTURE.md がなければ同様に指示
+     - 直前セッションログがなければ確認
+     - ※これらが揃うまで作業を開始しない
+
 □ 1. Handoff Bridge を読む
      - Must Read のファイルを確認
      - Warnings を把握
@@ -103,6 +109,7 @@
 ┌─────────────────────────────┐
 │ 5. Session Wrap-up          │
 │    - Parked処理             │
+│    - ARCHITECTURE.md更新    │
 │    - Handoff Bridge作成     │
 │    - セッションログ出力     │
 └─────────────────────────────┘
@@ -210,15 +217,31 @@
 │   │   └── 理由: [なぜBを選んだか]
 ```
 
+### Language Policy
+
+| 対象 | 言語 |
+|------|------|
+| Issue title/body | English |
+| PR title/body | English |
+| Commit message | English |
+| Code comments | English |
+| セッションログ | 日本語OK（プロジェクト言語） |
+| WORKFLOW.md等 | 日本語OK |
+
 ---
 
 ## Document Maintenance
 
 ### ARCHITECTURE.md 更新タイミング
 
-- 新しいファイル追加時
-- 大きな構造変更時
-- 行番号が大幅にずれた時
+**AIの責務**: 以下の変更を行った場合、セッション終了前にARCHITECTURE.mdを更新する
+
+- 新しいファイル追加時 → File Structure、Singleton Managers更新
+- 大きな構造変更時 → 該当セクション更新
+- 行番号が大幅にずれた時 → Line Number Map更新
+- 新しいUserDefaultsキー追加時 → Settings Architecture更新
+- 新しいData Flow追加時 → Data Flow更新
+- Known Issues発見時 → Known Issues / Technical Debt更新
 
 ### WORKFLOW.md 更新タイミング
 
@@ -269,7 +292,8 @@ Handoff Bridge確認しました。
 
 ## Document Information
 
-- Version: 0.2.0
+- Version: 0.2.1
 - Created: 2025-12-22 (S003)
+- Updated: 2025-12-24 (S004) - Language Policy追加、AIファイル確認チェック追加、ARCHITECTURE.md更新責務明記
 - Author: Claude (AI) with Zem
 - Next Review: S005 or after 3 sessions
