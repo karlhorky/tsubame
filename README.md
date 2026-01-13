@@ -100,7 +100,7 @@ mv build/Build/Products/Release/Tsubame.app /Applications/
   - Shows date + time for older saves (MM/dd HH:mm)
 - **Auto-Snapshot Isolation**: Auto-snapshots use a dedicated internal slot (Slot 0), never overwriting your manual saves
 
-> 💡 **Design Note**: We evaluated three architectural approaches for multiple slots: (A) shared slots for auto/manual, (B) reserved Slot 0 for auto, manual slots 1-5, (C) remove auto-snapshot entirely. We chose **Option B** to preserve the proven auto-restoration logic while ensuring manual saves are never overwritten. The data structure includes a `metadata` dictionary for future extensibility (Spaces/virtual desktop support). — *Design Decision #32, 2025-12-02*
+> 💡 **Design Note**: We evaluated three architectural approaches for multiple slots: (A) shared slots for auto/manual, (B) reserved Slot 0 for auto, manual slots 1-5, (C) remove auto-snapshot entirely. We chose **Option B** to preserve the proven auto-restoration logic while ensuring manual saves are never overwritten. The data structure includes a `metadata` dictionary for future extensibility (Spaces/virtual desktop support). — _Design Decision #32, 2025-12-02_
 
 ### Auto Snapshot & Persistence (v1.2.4+)
 
@@ -126,7 +126,7 @@ mv build/Build/Products/Release/Tsubame.app /Applications/
 - **Configurable Step Size**: 10-500 pixels (default 100 px)
 - **Keyboard-Only Workflow**: Complete window management without touching the trackpad
 
-> 💡 **Design Note**: This feature was inspired by "Tsubame" (燕/swallow) - the app's codename. The swift, agile movements of 燕返し (tsubame-gaeshi) suggested that window management should be equally nimble. Moving windows between screens is one thing, but fine-tuning their position should also be keyboard-driven. No more reaching for the trackpad just to nudge a window "a bit to the right." — *Zem, 2025-11-27*
+> 💡 **Design Note**: This feature was inspired by "Tsubame" (燕/swallow) - the app's codename. The swift, agile movements of 燕返し (tsubame-gaeshi) suggested that window management should be equally nimble. Moving windows between screens is one thing, but fine-tuning their position should also be keyboard-driven. No more reaching for the trackpad just to nudge a window "a bit to the right." — _Zem, 2025-11-27_
 
 ### Privacy & Security (v1.2.6+)
 
